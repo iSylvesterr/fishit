@@ -7814,6 +7814,10 @@ Teleport:AddButton({
 ----------------------------------------------------
 -- 🌐 WEBHOOK TAB
 ----------------------------------------------------
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
 local WebhookSection = Webhook:AddSection("Webhook Menu")
 local webhookURL = ""
 local selectedTiers = {}
@@ -7861,6 +7865,131 @@ Webhook:AddToggle("EnableWebhook", {
         end
     end
 })
+
+----------------------------------------------------
+-- 🎣 WEBHOOK LOGIC (Integrasi dengan sistem ikan)
+----------------------------------------------------
+local REFishCaught = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishCaught"]
+local REObtainedNewFish = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ObtainedNewFishNotification"]
+local REFishingStopped = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishingStopped"]
+local ItemsData = require(ReplicatedStorage.Items)
+
+local TierNames = {
+    [1] = "Common",
+    [2] = "Uncommon",
+    [3] = "Rare",
+    [4] = "Epic",
+    [5] = "Legendary",
+    [6] = "Mythic",
+    [7] = "Secret"
+}
+
+local function getRobloxThumbnail(assetId)
+    local id = tostring(assetId):match("%d+")
+    if not id then return nil end
+    local url = "https://thumbnails.roblox.com/v1/assets?assetIds=" .. id .. "&size=420x420&format=Png"
+    local success, response = pcall(function()
+        return request({
+            Url = url,
+            Method = "GET"
+        })
+    end)
+    if success and response.StatusCode == 200 then
+        local data = HttpService:JSONDecode(response.Body)
+        if data.data and data.data[1] and data.data[1].imageUrl then
+            return data.data[1].imageUrl
+        end
+    end
+    return nil
+end
+
+local fishData = {}
+
+REFishCaught.OnClientEvent:Connect(function(fishName, weightData)
+    fishData.name = fishName
+    fishData.weight = weightData.Weight
+
+    if ItemsData[fishName] and ItemsData[fishName].Data then
+        local data = ItemsData[fishName].Data
+        fishData.tier = data.Tier or 1
+        fishData.tierName = TierNames[data.Tier] or "Unknown"
+        fishData.iconAssetId = data.Icon
+    end
+end)
+
+REObtainedNewFish.OnClientEvent:Connect(function(fishId, weightData, notifData, isNew)
+    fishData.id = fishId
+    fishData.isNew = isNew
+end)
+
+REFishingStopped.OnClientEvent:Connect(function()
+    if not webhookEnabled or webhookURL == "" then return end
+
+    for i = 1, 10 do
+        if fishData.name and fishData.weight then break end
+        task.wait(0.1)
+    end
+
+    if not fishData.name then
+        fishData = {}
+        return
+    end
+
+    task.wait(0.2)
+
+    local player = Players.LocalPlayer
+    local tierName = fishData.tierName or "Unknown"
+
+    -- Filter tier
+    local tierAllowed = false
+    if table.find(selectedTiers, "All") then
+        tierAllowed = true
+    else
+        for _, t in ipairs(selectedTiers) do
+            if string.lower(t) == string.lower(tierName) then
+                tierAllowed = true
+                break
+            end
+        end
+    end
+    if not tierAllowed then
+        fishData = {}
+        return
+    end
+
+    local thumbnailUrl = getRobloxThumbnail(fishData.iconAssetId)
+
+    local embedData = {
+        ["embeds"] = {{
+            ["title"] = "🎣 New Fish Caught!",
+            ["color"] = 3447003,
+            ["image"] = thumbnailUrl and {["url"] = thumbnailUrl} or nil,
+            ["fields"] = {
+                {["name"] = "👤 Username", ["value"] = "||" .. player.Name .. "||", ["inline"] = true},
+                {["name"] = "🐟 Fish Name", ["value"] = fishData.name, ["inline"] = true},
+                {["name"] = "⚖️ Weight", ["value"] = string.format("%.2f kg", fishData.weight), ["inline"] = true},
+                {["name"] = "🏆 Tier", ["value"] = tierName, ["inline"] = true},
+                {["name"] = "First Catch", ["value"] = fishData.isNew and "✨ Yes" or "🔄 No", ["inline"] = true},
+                {["name"] = "🕐 Caught", ["value"] = "<t:" .. math.floor(os.time()) .. ":R>", ["inline"] = true}
+            },
+            ["footer"] = {["text"] = "Fish It Webhook by iSylHub Project"},
+            ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%S")
+        }}
+    }
+
+    task.spawn(function()
+        pcall(function()
+            request({
+                Url = webhookURL,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(embedData)
+            })
+        end)
+    end)
+
+    fishData = {}
+end)
 
 ----------------------------------------------------
 -- 🚀 LOAD DONE
