@@ -7922,7 +7922,14 @@ Teleport:AddButton({
 
 
 ----------------------------------------------------
--- 🌐 WEBHOOK TAB
+-- 📁 IMPORT & SERVICE SETUP
+----------------------------------------------------
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+----------------------------------------------------
+-- 🌐 WEBHOOK MENU (UI BAGIAN)
 ----------------------------------------------------
 local WebhookSection = Webhook:AddSection("Webhook Menu")
 
@@ -7931,6 +7938,7 @@ local webhookURL = ""
 local selectedTiers = {}
 local TierOptions = {"All", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"}
 
+-- ✅ Toggle untuk aktif/inaktif webhook
 Webhook:AddToggle("EnableWebhook", {
     Title = "Enable Webhook",
     Description = "Kirim notifikasi ke Discord saat dapat ikan",
@@ -7945,6 +7953,7 @@ Webhook:AddToggle("EnableWebhook", {
     end
 })
 
+-- 💬 Input URL Webhook
 Webhook:AddInput("WebhookURL", {
     Title = "Webhook URL",
     Default = "",
@@ -7959,6 +7968,7 @@ Webhook:AddInput("WebhookURL", {
     end
 })
 
+-- 🧭 Dropdown untuk filter tier
 Webhook:AddDropdown("TierSelect", {
     Title = "Select Tier Filter",
     Values = TierOptions,
@@ -7975,31 +7985,20 @@ Webhook:AddDropdown("TierSelect", {
 })
 
 ----------------------------------------------------
--- 🎣 SISTEM WEBHOOK + ANTI FREEZE
+-- ⚡ CACHING THUMBNAIL SYSTEM
 ----------------------------------------------------
-local HttpService = game:GetService("HttpService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-
-local REFishCaught = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishCaught"]
-local REObtainedNewFish = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ObtainedNewFishNotification"]
-local REFishingStopped = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishingStopped"]
-local ItemsData = require(ReplicatedStorage.Items)
-
-local TierNames = {
-    [1] = "Common",
-    [2] = "Uncommon",
-    [3] = "Rare",
-    [4] = "Epic",
-    [5] = "Legendary",
-    [6] = "Mythic",
-    [7] = "Secret"
-}
-
-----------------------------------------------------
--- ⚡ Thumbnail Cache + Preload System
-----------------------------------------------------
+local cachePath = "FishHub/thumbnail_cache.json"
 local thumbnailCache = {}
+
+if isfile(cachePath) then
+    local success, data = pcall(function()
+        return HttpService:JSONDecode(readfile(cachePath))
+    end)
+    if success and type(data) == "table" then
+        thumbnailCache = data
+        print("✅ Loaded thumbnail cache (" .. tostring(#thumbnailCache) .. " entries)")
+    end
+end
 
 local function getRobloxThumbnail(assetId)
     if not assetId then return nil end
@@ -8029,64 +8028,55 @@ local function getRobloxThumbnail(assetId)
     return nil
 end
 
--- 🔄 Preload semua thumbnail biar gak freeze saat mancing pertama kali
 task.spawn(function()
+    if not isfolder("FishHub") then makefolder("FishHub") end
     local itemsFolder = ReplicatedStorage:WaitForChild("Items")
     local allItems = itemsFolder:GetChildren()
     local total = #allItems
-    local loaded = 0
+    local new = 0
+    local reused = 0
 
-    for _, item in pairs(allItems) do
+    print("🔄 Preloading thumbnails (" .. total .. " items)...")
+
+    for _, item in ipairs(allItems) do
         if item:FindFirstChild("Data") then
             local ok, data = pcall(require, item.Data)
             if ok and data and data.Icon then
-                local url = getRobloxThumbnail(data.Icon)
-                if url then
-                    thumbnailCache[data.Icon] = url
-                    loaded += 1
+                if not thumbnailCache[data.Icon] then
+                    local thumb = getRobloxThumbnail(data.Icon)
+                    if thumb then
+                        new += 1
+                    end
+                else
+                    reused += 1
                 end
             end
         end
-        task.wait(0.05) -- jeda biar gak ngebebanin request
+        task.wait(0.05)
     end
 
-    print(string.format("✅ Preloaded %d/%d fish thumbnails.", loaded, total))
+    writefile(cachePath, HttpService:JSONEncode(thumbnailCache))
+    print(string.format("✅ Thumbnail cache done | %d new | %d reused", new, reused))
 end)
 
 ----------------------------------------------------
--- 🧠 Async Queue untuk Webhook (biar gak freeze)
+-- 🎣 SISTEM WEBHOOK (DENGAN CACHE)
 ----------------------------------------------------
-local webhookQueue = {}
-local sending = false
+local REFishCaught = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishCaught"]
+local REObtainedNewFish = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ObtainedNewFishNotification"]
+local REFishingStopped = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishingStopped"]
+local ItemsData = require(ReplicatedStorage.Items)
 
-local function processQueue()
-    if sending then return end
-    sending = true
+local TierNames = {
+    [1] = "Common",
+    [2] = "Uncommon",
+    [3] = "Rare",
+    [4] = "Epic",
+    [5] = "Legendary",
+    [6] = "Mythic",
+    [7] = "Secret"
+}
 
-    while #webhookQueue > 0 do
-        local payload = table.remove(webhookQueue, 1)
-        task.spawn(function()
-            local ok, err = pcall(function()
-                request({
-                    Url = payload.url,
-                    Method = "POST",
-                    Headers = {["Content-Type"] = "application/json"},
-                    Body = payload.body
-                })
-            end)
-            if not ok then
-                warn("❌ Webhook gagal dikirim:", err)
-            end
-        end)
-        task.wait(0.2) -- jeda antar webhook
-    end
-
-    sending = false
-end
-
-----------------------------------------------------
--- 🐟 Event Handling
-----------------------------------------------------
 local fishData = {}
 
 REFishCaught.OnClientEvent:Connect(function(fishName, weightData)
@@ -8107,44 +8097,47 @@ REObtainedNewFish.OnClientEvent:Connect(function(fishId, weightData, notifData, 
 end)
 
 REFishingStopped.OnClientEvent:Connect(function()
-    task.wait(0.2)
     if not webhookEnabled or webhookURL == "" then return end
 
-    local tierName = fishData.tierName or "Unknown"
-    if not table.find(selectedTiers, "All") and not table.find(selectedTiers, tierName) then
-        return
-    end
+    task.spawn(function()
+        local player = Players.LocalPlayer
+        local tierName = fishData.tierName or "Unknown"
 
-    local player = Players.LocalPlayer
-    local thumbnailUrl = thumbnailCache[fishData.iconAssetId] or getRobloxThumbnail(fishData.iconAssetId)
+        if not table.find(selectedTiers, "All") and not table.find(selectedTiers, tierName) then
+            return
+        end
 
-    -- 💬 Buat embed webhook
-    local embedData = {
-        ["embeds"] = {{
-            ["title"] = "🎣 New Fish Caught!",
-            ["color"] = 3447003,
-            ["image"] = thumbnailUrl and {["url"] = thumbnailUrl} or nil,
-            ["fields"] = {
-                {["name"] = "👤 Username", ["value"] = "||" .. player.Name .. "||", ["inline"] = true},
-                {["name"] = "🐟 Fish Name", ["value"] = fishData.name or "Unknown", ["inline"] = true},
-                {["name"] = "⚖️ Weight", ["value"] = string.format("%.2f kg", fishData.weight or 0), ["inline"] = true},
-                {["name"] = "🏆 Tier", ["value"] = tierName, ["inline"] = true},
-                {["name"] = "First Catch", ["value"] = fishData.isNew and "✨ Yes" or "🔄 No", ["inline"] = true},
-                {["name"] = "🕐 Caught", ["value"] = "<t:" .. math.floor(os.time()) .. ":R>", ["inline"] = true}
-            },
-            ["footer"] = { ["text"] = "Fish It Webhook by iSylHub Project" },
-            ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%S")
-        }}
-    }
+        local thumbnailUrl = thumbnailCache[fishData.iconAssetId]
 
-    -- 📨 Masukkan ke queue (biar gak freeze)
-    table.insert(webhookQueue, {
-        url = webhookURL,
-        body = HttpService:JSONEncode(embedData)
-    })
+        local embedData = {
+            ["embeds"] = {{
+                ["title"] = "🎣 New Fish Caught!",
+                ["color"] = 3447003,
+                ["image"] = thumbnailUrl and {["url"] = thumbnailUrl} or nil,
+                ["fields"] = {
+                    {["name"] = "👤 Username", ["value"] = "||" .. player.Name .. "||", ["inline"] = true},
+                    {["name"] = "🐟 Fish Name", ["value"] = fishData.name, ["inline"] = true},
+                    {["name"] = "⚖️ Weight", ["value"] = string.format("%.2f kg", fishData.weight), ["inline"] = true},
+                    {["name"] = "🏆 Tier", ["value"] = tierName, ["inline"] = true},
+                    {["name"] = "First Catch", ["value"] = fishData.isNew and "✨ Yes" or "🔄 No", ["inline"] = true},
+                    {["name"] = "🕐 Caught", ["value"] = "<t:" .. math.floor(os.time()) .. ":R>", ["inline"] = true}
+                },
+                ["footer"] = { ["text"] = "Fish It Webhook by iSylHub Project" },
+                ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%S")
+            }}
+        }
 
-    processQueue()
-    fishData = {}
+        pcall(function()
+            request({
+                Url = webhookURL,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(embedData)
+            })
+        end)
+
+        fishData = {}
+    end)
 end)
 
 
