@@ -7639,13 +7639,15 @@ Auto:AddInput("SellDelayInput", {
 })
 
 ----------------------------------------------------
--- ⚡ VULN TAB
+-- ⚡ VULN TAB (Super Instant Fishing v4 - Anti-Pause)
 ----------------------------------------------------
 local VulnFishingSection = Vuln:AddSection("Super Instant Fishing")
 
 local superInstantEnabled = false
 local instant_threads = {}
 local lastCycleTime = 0
+
+-- Timing variables (adjustable via textbox)
 local requestLoopDelay = 0.055
 local cycleWait = 1.0
 
@@ -7670,10 +7672,17 @@ local function start_instant_fishing()
     if superInstantEnabled then return end
     superInstantEnabled = true
     lastCycleTime = tick()
+
+    -- AUTO EQUIP FISHING ROD
     auto_equip_rod()
+    
     print("=== Auto Fishing (Perfect Timing + Anti-Pause) ===")
+    print("Starting in 1 seconds...")
     task.wait(1)
 
+    -- ========================================
+    -- SPAM FISHING COMPLETED (1 THREAD)
+    -- ========================================
     local spam_thread = task.spawn(function()
         while task.wait(0.015) do
             if superInstantEnabled then
@@ -7688,11 +7697,18 @@ local function start_instant_fishing()
     end)
     table.insert(instant_threads, spam_thread)
 
+    -- ========================================
+    -- WATCHDOG: Detect kalo diem terlalu lama
+    -- ========================================
     local watchdog = task.spawn(function()
         while superInstantEnabled do
-            task.wait(5)
+            task.wait(5) -- Check tiap 5 detik
+            
+            -- Kalo udah lebih dari 2 detik sejak cycle terakhir
             if tick() - lastCycleTime > 2 then
                 print("[KICKSTART] Detected pause! Forcing restart...")
+                
+                -- Force cancel buat kickstart cycle
                 for i = 1, 2 do
                     pcall(function()
                         local net = get_net()
@@ -7706,23 +7722,70 @@ local function start_instant_fishing()
         end
     end)
     table.insert(instant_threads, watchdog)
-
+    
+    -- ========================================
+    -- MAIN CYCLE
+    -- ========================================
     local main_cycle = task.spawn(function()
         while superInstantEnabled do
-            lastCycleTime = tick()
-            pcall(function()
-                local net = get_net()
-                if net then
-                    net:FindFirstChild("RF/CancelFishingInputs"):InvokeServer()
-                    net:FindFirstChild("RF/ChargeFishingRod"):InvokeServer(1761049514)
-                    task.wait(0.08)
-                    net:FindFirstChild("RF/RequestFishingMinigameStarted"):InvokeServer(-0.57, 0.95)
-                    task.wait(cycleWait)
-                end
+            lastCycleTime = tick() -- Update waktu cycle
+            
+            -- PHASE 1: CANCEL + CHARGE BERSAMAAN
+            task.spawn(function()
+                pcall(function()
+                    local net = get_net()
+                    if net then
+                        net:FindFirstChild("RF/CancelFishingInputs"):InvokeServer()
+                    end
+                end)
             end)
+            
+            task.spawn(function()
+                pcall(function()
+                    local net = get_net()
+                    if net then
+                        net:FindFirstChild("RF/ChargeFishingRod"):InvokeServer(1761049514)
+                    end
+                end)
+            end)
+            
+            task.wait(0.08)
+            
+            -- PHASE 2: REQUEST
+            for i = 1, 3 do
+                task.spawn(function()
+                    pcall(function()
+                        local net = get_net()
+                        if net then
+                            net:FindFirstChild("RF/RequestFishingMinigameStarted"):InvokeServer(-0.57, 0.95)
+                        end
+                    end)
+                end)
+                task.wait(requestLoopDelay)
+            end
+            
+            task.wait(0.1)
+            
+            -- PHASE 3: CHARGE LAGI
+            for i = 1, 5 do
+                task.spawn(function()
+                    pcall(function()
+                        local net = get_net()
+                        if net then
+                            net:FindFirstChild("RF/ChargeFishingRod"):InvokeServer(1761049514)
+                        end
+                    end)
+                end)
+                task.wait(0.01)
+            end
+            
+            task.wait(cycleWait)
         end
     end)
     table.insert(instant_threads, main_cycle)
+
+    print("ANTI-PAUSE WATCHDOG ACTIVE!")
+    print(string.format("Request Delay: %.3fs | Cycle: %.1fs", requestLoopDelay, cycleWait))
 
     Fluent:Notify({
         Title = "Super Instant Fishing",
@@ -7734,9 +7797,14 @@ end
 local function stop_instant_fishing()
     superInstantEnabled = false
     for _,th in ipairs(instant_threads) do
-        task.cancel(th)
+        pcall(function()
+            if type(th) == "userdata" and th.cancel then
+                pcall(function() th:cancel() end)
+            end
+        end)
     end
     instant_threads = {}
+
     Fluent:Notify({ Title = "Super Instant Fishing", Content = "Deactivated ❌", Duration = 3 })
 end
 
@@ -7745,9 +7813,50 @@ Vuln:AddToggle("SuperInstantFishing", {
     Description = "Enable Perfect Timing + Anti-Pause",
     Default = false,
     Callback = function(Value)
-        if Value then start_instant_fishing() else stop_instant_fishing() end
+        if Value then
+            start_instant_fishing()
+        else
+            stop_instant_fishing()
+        end
     end
 })
+
+Vuln:AddInput("RequestLoopDelay", {
+    Title = "Request Loop Delay (s)",
+    Default = "0.06",
+    Placeholder = "0.06",
+    Numeric = true,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num > 0 then
+            requestLoopDelay = num
+            Fluent:Notify({ 
+                Title = "Timing Updated", 
+                Content = "Request delay: " .. tostring(num) .. "s", 
+                Duration = 2 
+            })
+        end
+    end
+})
+
+Vuln:AddInput("CycleWait", {
+    Title = "Cycle Cooldown (s)",
+    Default = "1",
+    Placeholder = "1",
+    Numeric = true,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num >= 0 then
+            cycleWait = num
+            Fluent:Notify({ 
+                Title = "Timing Updated", 
+                Content = "Cycle cooldown: " .. tostring(num) .. "s", 
+                Duration = 2 
+            })
+        end
+    end
+})
+
 
 ----------------------------------------------------
 -- 🧭 TELEPORT TAB
