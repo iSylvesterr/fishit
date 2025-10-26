@@ -7811,94 +7811,150 @@ Teleport:AddButton({
     end
 })
 
+
 ----------------------------------------------------
--- 🌐 WEBHOOK TAB (Fish Catch Notifier)
+-- 🌐 WEBHOOK TAB
 ----------------------------------------------------
-local Webhook = Window:AddTab({ Title = "Webhook", Icon = "rss" })
 local WebhookSection = Webhook:AddSection("Webhook Menu")
 
--- ▪️ Variabel utama
+local webhookEnabled = false
 local webhookURL = ""
 local selectedTiers = {}
-local webhookEnabled = false
+local TierOptions = {"All", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"}
 
-local tierList = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret", "All" }
-
--- ▪️ Input Webhook URL
-Webhook:AddInput("WebhookURL", {
-    Title = "Webhook URL",
-    Default = "",
-    Placeholder = "https://discord.com/api/webhooks/...",
-    Callback = function(Value)
-        webhookURL = Value
-        Fluent:Notify({
-            Title = "Webhook URL Set ✅",
-            Content = "URL berhasil disimpan!",
-            Duration = 3
-        })
-    end
-})
-
--- ▪️ Dropdown Pilihan Tier (Multi-select)
-Webhook:AddDropdown("TierSelect", {
-    Title = "Select Fish Tier(s)",
-    Values = tierList,
-    Multi = true,
-    Default = {},
-    Callback = function(Values)
-        selectedTiers = Values
-        print("[Webhook] Selected tiers:", table.concat(Values, ", "))
-        Fluent:Notify({
-            Title = "Tier Updated",
-            Content = "Dipilih: " .. table.concat(Values, ", "),
-            Duration = 3
-        })
-    end
-})
-
--- ▪️ Toggle Aktif / Nonaktif Webhook
-Webhook:AddToggle("WebhookActive", {
-    Title = "Enable Webhook Notifications",
+-- ✅ Toggle untuk aktif/inaktif webhook
+Webhook:AddToggle("EnableWebhook", {
+    Title = "Enable Webhook",
+    Description = "Kirim notifikasi ke Discord saat dapat ikan",
     Default = false,
     Callback = function(Value)
         webhookEnabled = Value
-        if Value then
-            Fluent:Notify({
-                Title = "Webhook Active ✅",
-                Content = "Notifikasi webhook diaktifkan",
-                Duration = 3
-            })
-        else
-            Fluent:Notify({
-                Title = "Webhook Disabled ❌",
-                Content = "Notifikasi webhook dimatikan",
-                Duration = 3
-            })
-        end
+        Fluent:Notify({
+            Title = "Webhook",
+            Content = Value and "Enabled 🔔" or "Disabled ❌",
+            Duration = 3
+        })
+    end
+})
+
+-- 💬 TextBox untuk URL Webhook
+Webhook:AddInput("WebhookURL", {
+    Title = "Webhook URL",
+    Default = "",
+    Placeholder = "Masukkan URL Webhook Discord kamu...",
+    Callback = function(Value)
+        webhookURL = Value
+        Fluent:Notify({
+            Title = "Webhook URL",
+            Content = "Webhook URL diatur ✅",
+            Duration = 2
+        })
+    end
+})
+
+-- 🧭 Dropdown untuk filter tier
+Webhook:AddDropdown("TierSelect", {
+    Title = "Select Tier Filter",
+    Values = TierOptions,
+    Multi = true,
+    Default = {"All"},
+    Callback = function(Values)
+        selectedTiers = Values
+        Fluent:Notify({
+            Title = "Tier Filter Updated",
+            Content = "Tier terpilih: " .. table.concat(Values, ", "),
+            Duration = 3
+        })
     end
 })
 
 ----------------------------------------------------
--- 📤 FUNCTION: KIRIM WEBHOOK
+-- 🎣 SISTEM WEBHOOK (dari script yang kamu kasih)
 ----------------------------------------------------
 local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 
-local function sendWebhook(fishName, tierName, weight)
+local REFishCaught = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishCaught"]
+local REObtainedNewFish = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ObtainedNewFishNotification"]
+local REFishingStopped = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishingStopped"]
+local ItemsData = require(ReplicatedStorage.Items)
+
+local TierNames = {
+    [1] = "Common",
+    [2] = "Uncommon",
+    [3] = "Rare",
+    [4] = "Epic",
+    [5] = "Legendary",
+    [6] = "Mythic",
+    [7] = "Secret"
+}
+
+local function getRobloxThumbnail(assetId)
+    local id = tostring(assetId):match("%d+")
+    if not id then return nil end
+    local url = "https://thumbnails.roblox.com/v1/assets?assetIds=" .. id .. "&size=420x420&format=Png"
+    local success, response = pcall(function()
+        return request({
+            Url = url,
+            Method = "GET"
+        })
+    end)
+    if success and response.StatusCode == 200 then
+        local data = HttpService:JSONDecode(response.Body)
+        if data.data and data.data[1] and data.data[1].imageUrl then
+            return data.data[1].imageUrl
+        end
+    end
+    return nil
+end
+
+local fishData = {}
+
+REFishCaught.OnClientEvent:Connect(function(fishName, weightData)
+    fishData.name = fishName
+    fishData.weight = weightData.Weight
+    if ItemsData[fishName] and ItemsData[fishName].Data then
+        local data = ItemsData[fishName].Data
+        fishData.tier = data.Tier or 1
+        fishData.tierName = TierNames[data.Tier] or "Unknown"
+        fishData.iconAssetId = data.Icon
+    end
+end)
+
+REObtainedNewFish.OnClientEvent:Connect(function(fishId, weightData, notifData, isNew)
+    fishData.id = fishId
+    fishData.isNew = isNew
+end)
+
+REFishingStopped.OnClientEvent:Connect(function()
+    task.wait(0.2)
     if not webhookEnabled or webhookURL == "" then return end
 
-    -- kalau tier tidak dipilih & bukan “All”, skip
+    local player = Players.LocalPlayer
+    local tierName = fishData.tierName or "Unknown"
+
     if not table.find(selectedTiers, "All") and not table.find(selectedTiers, tierName) then
         return
     end
 
-    local data = {
-        username = "iSylHub 🎣",
-        embeds = {{
-            title = "🎣 New Fish Caught!",
-            description = string.format("**Fish:** %s\n**Tier:** %s\n**Weight:** %.2f kg", fishName, tierName, weight or 0),
-            color = 65280,
-            footer = { text = "iSylHub Webhook System" },
-            timestamp = DateTime.now():ToIsoDate()
+    local thumbnailUrl = getRobloxThumbnail(fishData.iconAssetId)
+
+    local embedData = {
+        ["embeds"] = {{
+            ["title"] = "🎣 New Fish Caught!",
+            ["color"] = 3447003,
+            ["image"] = thumbnailUrl and {["url"] = thumbnailUrl} or nil,
+            ["fields"] = {
+                {["name"] = "👤 Username", ["value"] = "||" .. player.Name .. "||", ["inline"] = true},
+                {["name"] = "🐟 Fish Name", ["value"] = fishData.name, ["inline"] = true},
+                {["name"] = "⚖️ Weight", ["value"] = string.format("%.2f kg", fishData.weight), ["inline"] = true},
+                {["name"] = "🏆 Tier", ["value"] = tierName, ["inline"] = true},
+                {["name"] = "First Catch", ["value"] = fishData.isNew and "✨ Yes" or "🔄 No", ["inline"] = true},
+                {["name"] = "🕐 Caught", ["value"] = "<t:" .. math.floor(os.time()) .. ":R>", ["inline"] = true}
+            },
+            ["footer"] = { ["text"] = "Fish It Webhook by iSylHub Project" },
+            ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%S")
         }}
     }
 
@@ -7906,27 +7962,15 @@ local function sendWebhook(fishName, tierName, weight)
         request({
             Url = webhookURL,
             Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode(data)
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(embedData)
         })
     end)
-end
 
-----------------------------------------------------
--- 🧠 CONTOH TEST (hapus kalau mau real)
-----------------------------------------------------
-Webhook:AddButton({
-    Title = "Test Send Webhook",
-    Description = "Test kirim dummy data ke webhook kamu",
-    Callback = function()
-        sendWebhook("Golden Tuna", "Mythic", 12.45)
-        Fluent:Notify({
-            Title = "Test Webhook Sent!",
-            Content = "Cek Discord kamu 🎣",
-            Duration = 3
-        })
-    end
-})
+    fishData = {}
+end)
+
+
 ----------------------------------------------------
 -- 🚀 LOAD DONE
 ----------------------------------------------------
