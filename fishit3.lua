@@ -3655,7 +3655,7 @@ Components.Window = (function()
 						if mobileButton then
 							local imageLabel = mobileButton:FindFirstChild("ImageLabel")
 							if imageLabel then
-								imageLabel.Image = Window.Minimized and "rbxassetid://10734896384" or "rbxassetid://10734897102"
+								imageLabel.Image = Window.Minimized and "rbxassetid://10734896384" or "rbxassetid://105242031754218"
 							end
 						end
 					else
@@ -3663,7 +3663,7 @@ Components.Window = (function()
 						if desktopButton then
 							local imageLabel = desktopButton:FindFirstChild("ImageLabel")
 							if imageLabel then
-								imageLabel.Image = Window.Minimized and "rbxassetid://10734896384" or "rbxassetid://10734897102"
+								imageLabel.Image = Window.Minimized and "rbxassetid://10734896384" or "rbxassetid://105242031754218"
 							end
 						end
 					end
@@ -6219,7 +6219,7 @@ local Icons = {
 	["lucide-monitor"] = "rbxassetid://10734896881",
 	["lucide-monitor-off"] = "rbxassetid://10734896360",
 	["lucide-monitor-speaker"] = "rbxassetid://10734896512",
-	["lucide-moon"] = "rbxassetid://105242031754218",
+	["lucide-moon"] = "rbxassetid://10734897102",
 	["lucide-more-horizontal"] = "rbxassetid://10734897250",
 	["lucide-more-vertical"] = "rbxassetid://10734897387",
 	["lucide-mountain"] = "rbxassetid://10734897956",
@@ -7041,7 +7041,7 @@ function Library:CreateMinimizer(Config)
 	if parentGui then parentGui.DisplayOrder = 1000 end
 	local isMobile = Mobile and true or false
 
-	local iconAsset = "rbxassetid://10734897102"
+	local iconAsset = "rbxassetid://105242031754218"
 	if type(Config.Icon) == "string" and Config.Icon ~= "" then
 		pcall(function()
 			local resolved = Library:GetIcon(Config.Icon)
@@ -7331,7 +7331,7 @@ local MinimizeButton = New("TextButton", {
 		}),
 	}),
 	New("ImageLabel", {
-		Image = "rbxassetid://10734897102",
+		Image = "rbxassetid://105242031754218",
 		Size = UDim2.new(0.8, 0, 0.8, 0),
 		Position = UDim2.new(0.5, 0, 0.5, 0),
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -7380,7 +7380,7 @@ local MobileMinimizeButton = New("TextButton", {
 		}),
 	}),
 	New("ImageLabel", {
-		Image = "rbxassetid://10734897102",
+		Image = "rbxassetid://105242031754218",
 		Size = UDim2.new(0.8, 0, 0.8, 0),
 		Position = UDim2.new(0.5, 0, 0.5, 0),
 		AnchorPoint = Vector2.new(0.5, 0.5),
