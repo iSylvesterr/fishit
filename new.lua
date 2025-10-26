@@ -7978,7 +7978,7 @@ Webhook:AddDropdown("TierSelect", {
 })
 
 ----------------------------------------------------
--- 🎣 SISTEM WEBHOOK (dari script yang kamu kasih)
+-- 🎣 SISTEM WEBHOOK DENGAN QUEUE
 ----------------------------------------------------
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7999,16 +7999,50 @@ local TierNames = {
     [7] = "Secret"
 }
 
+----------------------------------------------------
+-- 🔁 QUEUE SYSTEM
+----------------------------------------------------
+local webhookQueue = {}
+local isSending = false
+
+local function sendWebhookFromQueue()
+    if isSending then return end
+    isSending = true
+
+    task.spawn(function()
+        while #webhookQueue > 0 do
+            local data = table.remove(webhookQueue, 1)
+            if data and webhookEnabled and webhookURL ~= "" then
+                local success, err = pcall(function()
+                    request({
+                        Url = webhookURL,
+                        Method = "POST",
+                        Headers = {["Content-Type"] = "application/json"},
+                        Body = HttpService:JSONEncode(data)
+                    })
+                end)
+                if not success then
+                    warn("[Webhook Error]", err)
+                end
+                task.wait(0.35) -- cooldown biar gak spam Discord (350ms)
+            end
+        end
+        isSending = false
+    end)
+end
+
+----------------------------------------------------
+-- 🖼️ Thumbnail Loader
+----------------------------------------------------
 local function getRobloxThumbnail(assetId)
     local id = tostring(assetId):match("%d+")
     if not id then return nil end
     local url = "https://thumbnails.roblox.com/v1/assets?assetIds=" .. id .. "&size=420x420&format=Png"
+
     local success, response = pcall(function()
-        return request({
-            Url = url,
-            Method = "GET"
-        })
+        return request({ Url = url, Method = "GET" })
     end)
+
     if success and response.StatusCode == 200 then
         local data = HttpService:JSONDecode(response.Body)
         if data.data and data.data[1] and data.data[1].imageUrl then
@@ -8018,6 +8052,9 @@ local function getRobloxThumbnail(assetId)
     return nil
 end
 
+----------------------------------------------------
+-- 🐟 FISH EVENT HANDLERS
+----------------------------------------------------
 local fishData = {}
 
 REFishCaught.OnClientEvent:Connect(function(fishName, weightData)
@@ -8036,6 +8073,9 @@ REObtainedNewFish.OnClientEvent:Connect(function(fishId, weightData, notifData, 
     fishData.isNew = isNew
 end)
 
+----------------------------------------------------
+-- 🎣 Webhook Trigger Saat Fishing Selesai
+----------------------------------------------------
 REFishingStopped.OnClientEvent:Connect(function()
     task.wait(0.2)
     if not webhookEnabled or webhookURL == "" then return end
@@ -8048,7 +8088,6 @@ REFishingStopped.OnClientEvent:Connect(function()
     end
 
     local thumbnailUrl = getRobloxThumbnail(fishData.iconAssetId)
-
     local embedData = {
         ["embeds"] = {{
             ["title"] = "🎣 New Fish Caught!",
@@ -8067,14 +8106,9 @@ REFishingStopped.OnClientEvent:Connect(function()
         }}
     }
 
-    pcall(function()
-        request({
-            Url = webhookURL,
-            Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = HttpService:JSONEncode(embedData)
-        })
-    end)
+    -- Masukkan ke queue dan jalankan sender
+    table.insert(webhookQueue, embedData)
+    sendWebhookFromQueue()
 
     fishData = {}
 end)
