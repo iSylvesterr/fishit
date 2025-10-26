@@ -7931,7 +7931,6 @@ local webhookURL = ""
 local selectedTiers = {}
 local TierOptions = {"All", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"}
 
--- ✅ Toggle untuk aktif/inaktif webhook
 Webhook:AddToggle("EnableWebhook", {
     Title = "Enable Webhook",
     Description = "Kirim notifikasi ke Discord saat dapat ikan",
@@ -7946,7 +7945,6 @@ Webhook:AddToggle("EnableWebhook", {
     end
 })
 
--- 💬 TextBox untuk URL Webhook
 Webhook:AddInput("WebhookURL", {
     Title = "Webhook URL",
     Default = "",
@@ -7961,7 +7959,6 @@ Webhook:AddInput("WebhookURL", {
     end
 })
 
--- 🧭 Dropdown untuk filter tier
 Webhook:AddDropdown("TierSelect", {
     Title = "Select Tier Filter",
     Values = TierOptions,
@@ -7978,7 +7975,7 @@ Webhook:AddDropdown("TierSelect", {
 })
 
 ----------------------------------------------------
--- 🎣 SISTEM WEBHOOK DENGAN QUEUE
+-- 🎣 SISTEM WEBHOOK + ANTI FREEZE
 ----------------------------------------------------
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8000,66 +7997,102 @@ local TierNames = {
 }
 
 ----------------------------------------------------
--- 🔁 QUEUE SYSTEM
+-- ⚡ Thumbnail Cache + Preload System
 ----------------------------------------------------
-local webhookQueue = {}
-local isSending = false
+local thumbnailCache = {}
 
-local function sendWebhookFromQueue()
-    if isSending then return end
-    isSending = true
-
-    task.spawn(function()
-        while #webhookQueue > 0 do
-            local data = table.remove(webhookQueue, 1)
-            if data and webhookEnabled and webhookURL ~= "" then
-                local success, err = pcall(function()
-                    request({
-                        Url = webhookURL,
-                        Method = "POST",
-                        Headers = {["Content-Type"] = "application/json"},
-                        Body = HttpService:JSONEncode(data)
-                    })
-                end)
-                if not success then
-                    warn("[Webhook Error]", err)
-                end
-                task.wait(0.35) -- cooldown biar gak spam Discord (350ms)
-            end
-        end
-        isSending = false
-    end)
-end
-
-----------------------------------------------------
--- 🖼️ Thumbnail Loader
-----------------------------------------------------
 local function getRobloxThumbnail(assetId)
+    if not assetId then return nil end
+    if thumbnailCache[assetId] then
+        return thumbnailCache[assetId]
+    end
+
     local id = tostring(assetId):match("%d+")
     if not id then return nil end
-    local url = "https://thumbnails.roblox.com/v1/assets?assetIds=" .. id .. "&size=420x420&format=Png"
 
+    local url = "https://thumbnails.roblox.com/v1/assets?assetIds=" .. id .. "&size=420x420&format=Png"
     local success, response = pcall(function()
-        return request({ Url = url, Method = "GET" })
+        return request({
+            Url = url,
+            Method = "GET"
+        })
     end)
 
     if success and response.StatusCode == 200 then
         local data = HttpService:JSONDecode(response.Body)
         if data.data and data.data[1] and data.data[1].imageUrl then
-            return data.data[1].imageUrl
+            local imageUrl = data.data[1].imageUrl
+            thumbnailCache[assetId] = imageUrl
+            return imageUrl
         end
     end
     return nil
 end
 
+-- 🔄 Preload semua thumbnail biar gak freeze saat mancing pertama kali
+task.spawn(function()
+    local itemsFolder = ReplicatedStorage:WaitForChild("Items")
+    local allItems = itemsFolder:GetChildren()
+    local total = #allItems
+    local loaded = 0
+
+    for _, item in pairs(allItems) do
+        if item:FindFirstChild("Data") then
+            local ok, data = pcall(require, item.Data)
+            if ok and data and data.Icon then
+                local url = getRobloxThumbnail(data.Icon)
+                if url then
+                    thumbnailCache[data.Icon] = url
+                    loaded += 1
+                end
+            end
+        end
+        task.wait(0.05) -- jeda biar gak ngebebanin request
+    end
+
+    print(string.format("✅ Preloaded %d/%d fish thumbnails.", loaded, total))
+end)
+
 ----------------------------------------------------
--- 🐟 FISH EVENT HANDLERS
+-- 🧠 Async Queue untuk Webhook (biar gak freeze)
+----------------------------------------------------
+local webhookQueue = {}
+local sending = false
+
+local function processQueue()
+    if sending then return end
+    sending = true
+
+    while #webhookQueue > 0 do
+        local payload = table.remove(webhookQueue, 1)
+        task.spawn(function()
+            local ok, err = pcall(function()
+                request({
+                    Url = payload.url,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = payload.body
+                })
+            end)
+            if not ok then
+                warn("❌ Webhook gagal dikirim:", err)
+            end
+        end)
+        task.wait(0.2) -- jeda antar webhook
+    end
+
+    sending = false
+end
+
+----------------------------------------------------
+-- 🐟 Event Handling
 ----------------------------------------------------
 local fishData = {}
 
 REFishCaught.OnClientEvent:Connect(function(fishName, weightData)
     fishData.name = fishName
     fishData.weight = weightData.Weight
+
     if ItemsData[fishName] and ItemsData[fishName].Data then
         local data = ItemsData[fishName].Data
         fishData.tier = data.Tier or 1
@@ -8073,21 +8106,19 @@ REObtainedNewFish.OnClientEvent:Connect(function(fishId, weightData, notifData, 
     fishData.isNew = isNew
 end)
 
-----------------------------------------------------
--- 🎣 Webhook Trigger Saat Fishing Selesai
-----------------------------------------------------
 REFishingStopped.OnClientEvent:Connect(function()
     task.wait(0.2)
     if not webhookEnabled or webhookURL == "" then return end
 
-    local player = Players.LocalPlayer
     local tierName = fishData.tierName or "Unknown"
-
     if not table.find(selectedTiers, "All") and not table.find(selectedTiers, tierName) then
         return
     end
 
-    local thumbnailUrl = getRobloxThumbnail(fishData.iconAssetId)
+    local player = Players.LocalPlayer
+    local thumbnailUrl = thumbnailCache[fishData.iconAssetId] or getRobloxThumbnail(fishData.iconAssetId)
+
+    -- 💬 Buat embed webhook
     local embedData = {
         ["embeds"] = {{
             ["title"] = "🎣 New Fish Caught!",
@@ -8095,8 +8126,8 @@ REFishingStopped.OnClientEvent:Connect(function()
             ["image"] = thumbnailUrl and {["url"] = thumbnailUrl} or nil,
             ["fields"] = {
                 {["name"] = "👤 Username", ["value"] = "||" .. player.Name .. "||", ["inline"] = true},
-                {["name"] = "🐟 Fish Name", ["value"] = fishData.name, ["inline"] = true},
-                {["name"] = "⚖️ Weight", ["value"] = string.format("%.2f kg", fishData.weight), ["inline"] = true},
+                {["name"] = "🐟 Fish Name", ["value"] = fishData.name or "Unknown", ["inline"] = true},
+                {["name"] = "⚖️ Weight", ["value"] = string.format("%.2f kg", fishData.weight or 0), ["inline"] = true},
                 {["name"] = "🏆 Tier", ["value"] = tierName, ["inline"] = true},
                 {["name"] = "First Catch", ["value"] = fishData.isNew and "✨ Yes" or "🔄 No", ["inline"] = true},
                 {["name"] = "🕐 Caught", ["value"] = "<t:" .. math.floor(os.time()) .. ":R>", ["inline"] = true}
@@ -8106,10 +8137,13 @@ REFishingStopped.OnClientEvent:Connect(function()
         }}
     }
 
-    -- Masukkan ke queue dan jalankan sender
-    table.insert(webhookQueue, embedData)
-    sendWebhookFromQueue()
+    -- 📨 Masukkan ke queue (biar gak freeze)
+    table.insert(webhookQueue, {
+        url = webhookURL,
+        body = HttpService:JSONEncode(embedData)
+    })
 
+    processQueue()
     fishData = {}
 end)
 
