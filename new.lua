@@ -7812,185 +7812,118 @@ Teleport:AddButton({
 })
 
 ----------------------------------------------------
--- 🌐 WEBHOOK TAB
+-- 🧩 WEBHOOK TAB (Fixed System)
 ----------------------------------------------------
-local HttpService = game:GetService("HttpService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-
+local Webhook = Window:AddTab({ Title = "Webhook", Icon = "rss" })
 local WebhookSection = Webhook:AddSection("Webhook Menu")
+
+-- Variabel utama
 local webhookURL = ""
 local selectedTiers = {}
 local webhookEnabled = false
-local tierList = {"Common","Uncommon","Rare","Epic","Legendary","Mythic","Secret","All"}
 
+local tierList = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret", "All" }
+
+-- Input URL webhook
 Webhook:AddInput("WebhookURL", {
     Title = "Webhook URL",
-    Placeholder = "Masukkan URL Webhook kamu",
+    Default = "",
+    Placeholder = "https://discord.com/api/webhooks/...",
     Callback = function(Value)
         webhookURL = Value
         Fluent:Notify({
-            Title = "Webhook Updated",
-            Content = "Webhook URL diatur ke:\n" .. Value,
+            Title = "Webhook URL Set",
+            Content = "Webhook URL berhasil disimpan!",
             Duration = 3
         })
     end
 })
 
+-- Dropdown multi-tier
 Webhook:AddDropdown("TierSelect", {
-    Title = "Pilih Tier Ikan",
+    Title = "Select Fish Tier(s)",
     Values = tierList,
     Multi = true,
     Default = {},
     Callback = function(Values)
         selectedTiers = Values
+        print("[Webhook] Selected Tiers:", table.concat(selectedTiers, ", "))
         Fluent:Notify({
             Title = "Tier Updated",
-            Content = "Tier dipilih: " .. table.concat(Values, ", "),
+            Content = "Tier yang dipilih: " .. table.concat(selectedTiers, ", "),
             Duration = 3
         })
     end
 })
 
-Webhook:AddToggle("EnableWebhook", {
-    Title = "Aktifkan Webhook Notif",
-    Description = "Kirim notifikasi ke Webhook saat ikan didapat",
+-- Toggle webhook aktif/nonaktif
+Webhook:AddToggle("WebhookActive", {
+    Title = "Enable Webhook Notifications",
     Default = false,
     Callback = function(Value)
         webhookEnabled = Value
         if Value then
-            Fluent:Notify({ Title = "Webhook", Content = "Webhook aktif ✅", Duration = 3 })
+            Fluent:Notify({
+                Title = "Webhook Active",
+                Content = "Webhook notification diaktifkan ✅",
+                Duration = 3
+            })
         else
-            Fluent:Notify({ Title = "Webhook", Content = "Webhook nonaktif ❌", Duration = 3 })
+            Fluent:Notify({
+                Title = "Webhook Disabled",
+                Content = "Webhook notification dimatikan ❌",
+                Duration = 3
+            })
         end
     end
 })
 
 ----------------------------------------------------
--- 🎣 WEBHOOK LOGIC (Integrasi dengan sistem ikan)
+-- 📡 FUNCTION UNTUK KIRIM WEBHOOK
 ----------------------------------------------------
-local REFishCaught = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishCaught"]
-local REObtainedNewFish = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ObtainedNewFishNotification"]
-local REFishingStopped = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishingStopped"]
-local ItemsData = require(ReplicatedStorage.Items)
-
-local TierNames = {
-    [1] = "Common",
-    [2] = "Uncommon",
-    [3] = "Rare",
-    [4] = "Epic",
-    [5] = "Legendary",
-    [6] = "Mythic",
-    [7] = "Secret"
-}
-
-local function getRobloxThumbnail(assetId)
-    local id = tostring(assetId):match("%d+")
-    if not id then return nil end
-    local url = "https://thumbnails.roblox.com/v1/assets?assetIds=" .. id .. "&size=420x420&format=Png"
-    local success, response = pcall(function()
-        return request({
-            Url = url,
-            Method = "GET"
-        })
-    end)
-    if success and response.StatusCode == 200 then
-        local data = HttpService:JSONDecode(response.Body)
-        if data.data and data.data[1] and data.data[1].imageUrl then
-            return data.data[1].imageUrl
-        end
-    end
-    return nil
-end
-
-local fishData = {}
-
-REFishCaught.OnClientEvent:Connect(function(fishName, weightData)
-    fishData.name = fishName
-    fishData.weight = weightData.Weight
-
-    if ItemsData[fishName] and ItemsData[fishName].Data then
-        local data = ItemsData[fishName].Data
-        fishData.tier = data.Tier or 1
-        fishData.tierName = TierNames[data.Tier] or "Unknown"
-        fishData.iconAssetId = data.Icon
-    end
-end)
-
-REObtainedNewFish.OnClientEvent:Connect(function(fishId, weightData, notifData, isNew)
-    fishData.id = fishId
-    fishData.isNew = isNew
-end)
-
-REFishingStopped.OnClientEvent:Connect(function()
+local function sendWebhook(tier, fishName)
     if not webhookEnabled or webhookURL == "" then return end
 
-    for i = 1, 10 do
-        if fishData.name and fishData.weight then break end
-        task.wait(0.1)
+    -- Cek apakah tier cocok
+    if not table.find(selectedTiers, "All") and not table.find(selectedTiers, tier) then
+        return -- skip tier yang gak dipilih
     end
 
-    if not fishData.name then
-        fishData = {}
-        return
-    end
-
-    task.wait(0.2)
-
-    local player = Players.LocalPlayer
-    local tierName = fishData.tierName or "Unknown"
-
-    -- Filter tier
-    local tierAllowed = false
-    if table.find(selectedTiers, "All") then
-        tierAllowed = true
-    else
-        for _, t in ipairs(selectedTiers) do
-            if string.lower(t) == string.lower(tierName) then
-                tierAllowed = true
-                break
-            end
-        end
-    end
-    if not tierAllowed then
-        fishData = {}
-        return
-    end
-
-    local thumbnailUrl = getRobloxThumbnail(fishData.iconAssetId)
-
-    local embedData = {
-        ["embeds"] = {{
-            ["title"] = "🎣 New Fish Caught!",
-            ["color"] = 3447003,
-            ["image"] = thumbnailUrl and {["url"] = thumbnailUrl} or nil,
-            ["fields"] = {
-                {["name"] = "👤 Username", ["value"] = "||" .. player.Name .. "||", ["inline"] = true},
-                {["name"] = "🐟 Fish Name", ["value"] = fishData.name, ["inline"] = true},
-                {["name"] = "⚖️ Weight", ["value"] = string.format("%.2f kg", fishData.weight), ["inline"] = true},
-                {["name"] = "🏆 Tier", ["value"] = tierName, ["inline"] = true},
-                {["name"] = "First Catch", ["value"] = fishData.isNew and "✨ Yes" or "🔄 No", ["inline"] = true},
-                {["name"] = "🕐 Caught", ["value"] = "<t:" .. math.floor(os.time()) .. ":R>", ["inline"] = true}
-            },
-            ["footer"] = {["text"] = "Fish It Webhook by iSylHub Project"},
-            ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%S")
-        }}
-    }
-
-    task.spawn(function()
-        pcall(function()
-            request({
-                Url = webhookURL,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = HttpService:JSONEncode(embedData)
+    local success, err = pcall(function()
+        request({
+            Url = webhookURL,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = game:GetService("HttpService"):JSONEncode({
+                username = "iSylHub 🎣",
+                embeds = {{
+                    title = "🎣 New Fish Caught!",
+                    description = "**Fish:** " .. fishName .. "\n**Tier:** " .. tier,
+                    color = 65280,
+                    footer = { text = "iSylHub Webhook System" },
+                    timestamp = DateTime.now():ToIsoDate()
+                }}
             })
-        end)
+        })
     end)
 
-    fishData = {}
-end)
+    if success then
+        print("[Webhook] Sent successfully for:", fishName, tier)
+    else
+        warn("[Webhook] Error sending:", err)
+    end
+end
 
+----------------------------------------------------
+-- 🧠 CONTOH PENGGUNAAN
+----------------------------------------------------
+-- kamu bisa panggil fungsi ini kapan pun saat ikan tertangkap
+-- contoh simulasi:
+task.spawn(function()
+    while task.wait(15) do -- setiap 15 detik buat test
+        sendWebhook("Mythic", "Golden Tuna")
+    end
+end)
 ----------------------------------------------------
 -- 🚀 LOAD DONE
 ----------------------------------------------------
