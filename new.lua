@@ -7812,19 +7812,19 @@ Teleport:AddButton({
 })
 
 ----------------------------------------------------
--- 🧩 WEBHOOK TAB (Fixed System)
+-- 🌐 WEBHOOK TAB (Fish Catch Notifier)
 ----------------------------------------------------
 local Webhook = Window:AddTab({ Title = "Webhook", Icon = "rss" })
 local WebhookSection = Webhook:AddSection("Webhook Menu")
 
--- Variabel utama
+-- ▪️ Variabel utama
 local webhookURL = ""
 local selectedTiers = {}
 local webhookEnabled = false
 
 local tierList = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret", "All" }
 
--- Input URL webhook
+-- ▪️ Input Webhook URL
 Webhook:AddInput("WebhookURL", {
     Title = "Webhook URL",
     Default = "",
@@ -7832,14 +7832,14 @@ Webhook:AddInput("WebhookURL", {
     Callback = function(Value)
         webhookURL = Value
         Fluent:Notify({
-            Title = "Webhook URL Set",
-            Content = "Webhook URL berhasil disimpan!",
+            Title = "Webhook URL Set ✅",
+            Content = "URL berhasil disimpan!",
             Duration = 3
         })
     end
 })
 
--- Dropdown multi-tier
+-- ▪️ Dropdown Pilihan Tier (Multi-select)
 Webhook:AddDropdown("TierSelect", {
     Title = "Select Fish Tier(s)",
     Values = tierList,
@@ -7847,16 +7847,16 @@ Webhook:AddDropdown("TierSelect", {
     Default = {},
     Callback = function(Values)
         selectedTiers = Values
-        print("[Webhook] Selected Tiers:", table.concat(selectedTiers, ", "))
+        print("[Webhook] Selected tiers:", table.concat(Values, ", "))
         Fluent:Notify({
             Title = "Tier Updated",
-            Content = "Tier yang dipilih: " .. table.concat(selectedTiers, ", "),
+            Content = "Dipilih: " .. table.concat(Values, ", "),
             Duration = 3
         })
     end
 })
 
--- Toggle webhook aktif/nonaktif
+-- ▪️ Toggle Aktif / Nonaktif Webhook
 Webhook:AddToggle("WebhookActive", {
     Title = "Enable Webhook Notifications",
     Default = false,
@@ -7864,14 +7864,14 @@ Webhook:AddToggle("WebhookActive", {
         webhookEnabled = Value
         if Value then
             Fluent:Notify({
-                Title = "Webhook Active",
-                Content = "Webhook notification diaktifkan ✅",
+                Title = "Webhook Active ✅",
+                Content = "Notifikasi webhook diaktifkan",
                 Duration = 3
             })
         else
             Fluent:Notify({
-                Title = "Webhook Disabled",
-                Content = "Webhook notification dimatikan ❌",
+                Title = "Webhook Disabled ❌",
+                Content = "Notifikasi webhook dimatikan",
                 Duration = 3
             })
         end
@@ -7879,51 +7879,54 @@ Webhook:AddToggle("WebhookActive", {
 })
 
 ----------------------------------------------------
--- 📡 FUNCTION UNTUK KIRIM WEBHOOK
+-- 📤 FUNCTION: KIRIM WEBHOOK
 ----------------------------------------------------
-local function sendWebhook(tier, fishName)
+local HttpService = game:GetService("HttpService")
+
+local function sendWebhook(fishName, tierName, weight)
     if not webhookEnabled or webhookURL == "" then return end
 
-    -- Cek apakah tier cocok
-    if not table.find(selectedTiers, "All") and not table.find(selectedTiers, tier) then
-        return -- skip tier yang gak dipilih
+    -- kalau tier tidak dipilih & bukan “All”, skip
+    if not table.find(selectedTiers, "All") and not table.find(selectedTiers, tierName) then
+        return
     end
 
-    local success, err = pcall(function()
+    local data = {
+        username = "iSylHub 🎣",
+        embeds = {{
+            title = "🎣 New Fish Caught!",
+            description = string.format("**Fish:** %s\n**Tier:** %s\n**Weight:** %.2f kg", fishName, tierName, weight or 0),
+            color = 65280,
+            footer = { text = "iSylHub Webhook System" },
+            timestamp = DateTime.now():ToIsoDate()
+        }}
+    }
+
+    pcall(function()
         request({
             Url = webhookURL,
             Method = "POST",
             Headers = { ["Content-Type"] = "application/json" },
-            Body = game:GetService("HttpService"):JSONEncode({
-                username = "iSylHub 🎣",
-                embeds = {{
-                    title = "🎣 New Fish Caught!",
-                    description = "**Fish:** " .. fishName .. "\n**Tier:** " .. tier,
-                    color = 65280,
-                    footer = { text = "iSylHub Webhook System" },
-                    timestamp = DateTime.now():ToIsoDate()
-                }}
-            })
+            Body = HttpService:JSONEncode(data)
         })
     end)
-
-    if success then
-        print("[Webhook] Sent successfully for:", fishName, tier)
-    else
-        warn("[Webhook] Error sending:", err)
-    end
 end
 
 ----------------------------------------------------
--- 🧠 CONTOH PENGGUNAAN
+-- 🧠 CONTOH TEST (hapus kalau mau real)
 ----------------------------------------------------
--- kamu bisa panggil fungsi ini kapan pun saat ikan tertangkap
--- contoh simulasi:
-task.spawn(function()
-    while task.wait(15) do -- setiap 15 detik buat test
-        sendWebhook("Mythic", "Golden Tuna")
+Webhook:AddButton({
+    Title = "Test Send Webhook",
+    Description = "Test kirim dummy data ke webhook kamu",
+    Callback = function()
+        sendWebhook("Golden Tuna", "Mythic", 12.45)
+        Fluent:Notify({
+            Title = "Test Webhook Sent!",
+            Content = "Cek Discord kamu 🎣",
+            Duration = 3
+        })
     end
-end)
+})
 ----------------------------------------------------
 -- 🚀 LOAD DONE
 ----------------------------------------------------
