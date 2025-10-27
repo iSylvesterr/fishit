@@ -7542,52 +7542,95 @@ Home:AddButton({
 })
 
 ----------------------------------------------------
--- 🎣 MAIN TAB (Auto Fishing)
+-- 🎣 MAIN TAB (Auto Fishing v2 Fast Loop)
 ----------------------------------------------------
-local MainFishingSection = Main:AddSection("Auto Fishing")
+local MainFishingSection = Main:AddSection("Auto Fishing v2")
 
 local autoFishEnabled = false
-local fishingLoop
+local fishingThread
 
-local function auto_equip_rod_main()
-    pcall(function()
-        local args = { [1] = 1 }
-        game:GetService("ReplicatedStorage").Packages._Index:FindFirstChild("sleitnick_net@0.2.0").net:FindFirstChild("RE/EquipToolFromHotbar"):FireServer(unpack(args))
-        print("[Auto Equip] Fishing rod equipped!")
+local function startAutoFish()
+    print("=== Auto Fishing v2 (Fast Loop) ===")
+    print("Starting in 2 seconds...")
+    task.wait(0.5)
+
+    task.spawn(function()
+        -- EQUIP ROD SEKALI DI AWAL
+        print("[Setup] Equipping fishing rod...")
+        pcall(function()
+            local args = { [1] = 1 }
+            game:GetService("ReplicatedStorage").Packages._Index
+                :FindFirstChild("sleitnick_net@0.2.0").net
+                :FindFirstChild("RE/EquipToolFromHotbar")
+                :FireServer(unpack(args))
+        end)
+
+        task.wait(1)
+        print("[Setup] Rod equipped! Starting fishing loop...\n")
+
+        -- LOOP: CHARGE → CAST → COMPLETE
+        while autoFishEnabled do
+            print("[1] Charging rod...")
+            pcall(function()
+                local args = { [4] = tick() }
+                game:GetService("ReplicatedStorage").Packages._Index
+                    :FindFirstChild("sleitnick_net@0.2.0").net
+                    :FindFirstChild("RF/ChargeFishingRod")
+                    :InvokeServer(unpack(args))
+            end)
+
+            task.wait(0.3)
+
+            print("[2] Casting...")
+            pcall(function()
+                local args = {
+                    [1] = math.random(-150, -50) / 100,
+                    [2] = math.random(80, 100) / 100,
+                    [3] = tick()
+                }
+                game:GetService("ReplicatedStorage").Packages._Index
+                    :FindFirstChild("sleitnick_net@0.2.0").net
+                    :FindFirstChild("RF/RequestFishingMinigameStarted")
+                    :InvokeServer(unpack(args))
+            end)
+
+            task.wait(1.2)
+
+            print("[3] Catching fish...")
+            pcall(function()
+                game:GetService("ReplicatedStorage").Packages._Index
+                    :FindFirstChild("sleitnick_net@0.2.0").net
+                    :FindFirstChild("RE/FishingCompleted")
+                    :FireServer()
+            end)
+
+            task.wait(0.1)
+            print("--- Caught! Next cycle ---\n")
+        end
     end)
+
+    print("Fishing loop running!")
 end
 
-Main:AddToggle("AutoFish", {
-    Title = "Auto Fishing",
-    Description = "Automatically fish without manual input",
+Main:AddToggle("AutoFishingV2", {
+    Title = "Auto Fishing v2 (Fast Loop)",
+    Description = "Enable super-fast auto fishing loop",
     Default = false,
     Callback = function(Value)
         autoFishEnabled = Value
         if Value then
-            auto_equip_rod_main()
-            
             Fluent:Notify({
-                Title = "Auto Fishing",
-                Content = "Auto fishing enabled! 🎣 Rod equipped",
+                Title = "Auto Fishing v2",
+                Content = "Started 🎣",
                 Duration = 3
             })
-            fishingLoop = task.spawn(function()
-                while autoFishEnabled do
-                    pcall(function()
-                        local rs = game:GetService("ReplicatedStorage")
-                        local net = rs.Packages._Index:FindFirstChild("sleitnick_net@0.2.0").net
-                        net:FindFirstChild("RF/ChargeFishingRod"):InvokeServer(1761049514)
-                        task.wait(0.1)
-                        net:FindFirstChild("RF/RequestFishingMinigameStarted"):InvokeServer(-0.57, 0.95)
-                        task.wait(0.1)
-                        net:FindFirstChild("RE/FishingCompleted"):FireServer()
-                    end)
-                    task.wait(0.1)
-                end
-            end)
+            fishingThread = task.spawn(startAutoFish)
         else
-            Fluent:Notify({ Title = "Auto Fishing", Content = "Auto fishing disabled", Duration = 3 })
-            if fishingLoop then task.cancel(fishingLoop) end
+            Fluent:Notify({
+                Title = "Auto Fishing v2",
+                Content = "Stopped ❌",
+                Duration = 3
+            })
         end
     end
 })
