@@ -7542,19 +7542,22 @@ Home:AddButton({
 })
 
 ----------------------------------------------------
--- 🎣 MAIN TAB (Auto Fishing System - Fast Legit)
+-- 🎣 MAIN TAB (Fast Legit Only)
 ----------------------------------------------------
 local MainSection = Main:AddSection("Auto Fishing System")
 
 local autoFishEnabled = false
 local autoFishThread
 
--- Fungsi loop Fast Legit
+----------------------------------------------------
+-- ⚡ FAST LEGIT MODE (Spam Equip + Auto Click)
+----------------------------------------------------
 local function fastLegitLoop()
     print("=== Fast Legit Fishing ===")
 
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local VirtualInputManager = game:GetService("VirtualInputManager")
+
     local netFolder = ReplicatedStorage.Packages._Index:FindFirstChild("sleitnick_net@0.2.0").net
     local EquipToolRemote = netFolder:FindFirstChild("RE/EquipToolFromHotbar")
 
@@ -7564,7 +7567,7 @@ local function fastLegitLoop()
             EquipToolRemote:FireServer(1)
         end)
 
-        -- simulasi auto click cepat
+        -- simulasi auto click super cepat
         pcall(function()
             VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
             task.wait(0.001)
@@ -7577,45 +7580,31 @@ local function fastLegitLoop()
     print("Fast Legit loop stopped.")
 end
 
--- Fungsi untuk toggle dan jalankan loop
-local function toggleAutoFishing()
-    autoFishEnabled = not autoFishEnabled
-
-    if autoFishEnabled then
-        autoFishThread = task.spawn(fastLegitLoop)
-        Fluent:Notify({ Title = "Auto Fishing", Content = "Started ✅", Duration = 3 })
-    else
-        Fluent:Notify({ Title = "Auto Fishing", Content = "Stopped ❌", Duration = 3 })
-    end
-
-    -- Update UI toggle agar sinkron
-    if MainSection and MainSection:GetElementById("AutoFishingSystem") then
-        MainSection:GetElementById("AutoFishingSystem"):SetValue(autoFishEnabled)
-    end
-end
-
--- Toggle Auto Fishing di UI
+----------------------------------------------------
+-- 🟢 TOGGLE: START / STOP
+----------------------------------------------------
 Main:AddToggle("AutoFishingSystem", {
-    Title = "Auto Fishing System",
-    Description = "Toggle ON/OFF Auto Fishing (Fast Legit)",
+    Title = "Fast Legit Auto Fishing",
+    Description = "Toggle ON to start Fast Legit fishing",
     Default = false,
     Callback = function(Value)
         autoFishEnabled = Value
+
         if Value then
+            Fluent:Notify({
+                Title = "Auto Fishing",
+                Content = "Fast Legit mode started 🚀",
+                Duration = 3
+            })
             autoFishThread = task.spawn(fastLegitLoop)
-            Fluent:Notify({ Title = "Auto Fishing", Content = "Started ✅", Duration = 3 })
         else
-            Fluent:Notify({ Title = "Auto Fishing", Content = "Stopped ❌", Duration = 3 })
+            Fluent:Notify({
+                Title = "Auto Fishing",
+                Content = "Stopped ❌",
+                Duration = 3
+            })
         end
     end
-})
-
--- Keybind klik kanan mouse untuk toggle
-Main:AddKeybind("AutoFishingKeybind", {
-    Title = "Toggle Auto Fishing (Right Click)",
-    Default = Enum.UserInputType.MouseButton2, -- MouseButton2 = klik kanan
-    Mode = "Toggle", -- otomatis toggle ON/OFF
-    Callback = toggleAutoFishing
 })
 ----------------------------------------------------
 -- 🤖 AUTO TAB
