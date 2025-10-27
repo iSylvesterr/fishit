@@ -7544,77 +7544,71 @@ Home:AddButton({
 ----------------------------------------------------
 -- 🎣 MAIN TAB (Auto Fishing v2 Fast Loop)
 ----------------------------------------------------
-local MainFishingSection = Main:AddSection("Auto Fishing v2")
+local MainSection = Main:AddSection("Auto Fishing v2")
 
 local autoFishEnabled = false
-local fishingThread
+local autoFishThread
 
 local function startAutoFish()
     print("=== Auto Fishing v2 (Fast Loop) ===")
     print("Starting in 2 seconds...")
     task.wait(0.5)
 
-    task.spawn(function()
-        -- EQUIP ROD SEKALI DI AWAL
-        print("[Setup] Equipping fishing rod...")
-        pcall(function()
-            local args = { [1] = 1 }
-            game:GetService("ReplicatedStorage").Packages._Index
-                :FindFirstChild("sleitnick_net@0.2.0").net
-                :FindFirstChild("RE/EquipToolFromHotbar")
-                :FireServer(unpack(args))
-        end)
-
-        task.wait(1)
-        print("[Setup] Rod equipped! Starting fishing loop...\n")
-
-        -- LOOP: CHARGE → CAST → COMPLETE
-        while autoFishEnabled do
-            print("[1] Charging rod...")
-            pcall(function()
-                local args = { [4] = tick() }
-                game:GetService("ReplicatedStorage").Packages._Index
-                    :FindFirstChild("sleitnick_net@0.2.0").net
-                    :FindFirstChild("RF/ChargeFishingRod")
-                    :InvokeServer(unpack(args))
-            end)
-
-            task.wait(0.3)
-
-            print("[2] Casting...")
-            pcall(function()
-                local args = {
-                    [1] = math.random(-150, -50) / 100,
-                    [2] = math.random(80, 100) / 100,
-                    [3] = tick()
-                }
-                game:GetService("ReplicatedStorage").Packages._Index
-                    :FindFirstChild("sleitnick_net@0.2.0").net
-                    :FindFirstChild("RF/RequestFishingMinigameStarted")
-                    :InvokeServer(unpack(args))
-            end)
-
-            task.wait(1.2)
-
-            print("[3] Catching fish...")
-            pcall(function()
-                game:GetService("ReplicatedStorage").Packages._Index
-                    :FindFirstChild("sleitnick_net@0.2.0").net
-                    :FindFirstChild("RE/FishingCompleted")
-                    :FireServer()
-            end)
-
-            task.wait(0.1)
-            print("--- Caught! Next cycle ---\n")
-        end
+    print("[Setup] Equipping fishing rod...")
+    pcall(function()
+        local args = { [1] = 1 }
+        game:GetService("ReplicatedStorage").Packages._Index
+            :FindFirstChild("sleitnick_net@0.2.0").net
+            :FindFirstChild("RE/EquipToolFromHotbar")
+            :FireServer(unpack(args))
     end)
 
-    print("Fishing loop running!")
+    task.wait(1)
+    print("[Setup] Rod equipped! Starting fishing loop...\n")
+
+    while autoFishEnabled do
+        print("[1] Charging rod...")
+        pcall(function()
+            local args = { [4] = tick() }
+            game:GetService("ReplicatedStorage").Packages._Index
+                :FindFirstChild("sleitnick_net@0.2.0").net
+                :FindFirstChild("RF/ChargeFishingRod")
+                :InvokeServer(unpack(args))
+        end)
+
+        task.wait(0.3)
+
+        print("[2] Casting...")
+        pcall(function()
+            local args = {
+                [1] = math.random(-150, -50) / 100,
+                [2] = math.random(80, 100) / 100,
+                [3] = tick()
+            }
+            game:GetService("ReplicatedStorage").Packages._Index
+                :FindFirstChild("sleitnick_net@0.2.0").net
+                :FindFirstChild("RF/RequestFishingMinigameStarted")
+                :InvokeServer(unpack(args))
+        end)
+
+        task.wait(1.2)
+
+        print("[3] Catching fish...")
+        pcall(function()
+            game:GetService("ReplicatedStorage").Packages._Index
+                :FindFirstChild("sleitnick_net@0.2.0").net
+                :FindFirstChild("RE/FishingCompleted")
+                :FireServer()
+        end)
+
+        task.wait(0.1)
+        print("--- Caught! Next cycle ---\n")
+    end
 end
 
 Main:AddToggle("AutoFishingV2", {
     Title = "Auto Fishing v2 (Fast Loop)",
-    Description = "Enable super-fast auto fishing loop",
+    Description = "Auto equip rod and start fast loop",
     Default = false,
     Callback = function(Value)
         autoFishEnabled = Value
@@ -7624,7 +7618,7 @@ Main:AddToggle("AutoFishingV2", {
                 Content = "Started 🎣",
                 Duration = 3
             })
-            fishingThread = task.spawn(startAutoFish)
+            autoFishThread = task.spawn(startAutoFish)
         else
             Fluent:Notify({
                 Title = "Auto Fishing v2",
@@ -7761,22 +7755,17 @@ Teleport:AddButton({
 ----------------------------------------------------
 -- 🌐 WEBHOOK TAB
 ----------------------------------------------------
-local WebhookSection = Webhook:AddSection("Webhook Menu")
 
-local HttpService = game:GetService("HttpService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
+----------------------------------------------------
+-- 🌐 WEBHOOK TAB
+----------------------------------------------------
+local WebhookSection = Webhook:AddSection("Webhook Menu")
 
 local webhookEnabled = false
 local webhookURL = ""
 local selectedTiers = {}
 local TierOptions = {"All", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"}
-local thumbnailCache = {}
-local fishCache = {}
 
-----------------------------------------------------
--- 🧩 UI ELEMENTS
-----------------------------------------------------
 Webhook:AddToggle("EnableWebhook", {
     Title = "Enable Webhook",
     Description = "Kirim notifikasi ke Discord saat dapat ikan",
@@ -7821,120 +7810,178 @@ Webhook:AddDropdown("TierSelect", {
 })
 
 ----------------------------------------------------
--- 🧠 CACHE & HELPER FUNCTION
+-- 🎣 SISTEM WEBHOOK + ANTI FREEZE
 ----------------------------------------------------
-local function preloadFishData()
-    local itemsFolder = ReplicatedStorage:WaitForChild("Items")
-    for _, item in pairs(itemsFolder:GetChildren()) do
-        if item:FindFirstChild("Data") then
-            local success, data = pcall(require, item.Data)
-            if success and data and data.Id then
-                fishCache[data.Id] = {
-                    Name = item.Name,
-                    Rarity = data.Rarity or 1,
-                    Icon = data.Icon
-                }
-            end
-        end
-    end
-    print("✅ Cached", tostring(#fishCache), "fish data entries.")
-end
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 
-task.spawn(preloadFishData)
+local REFishCaught = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishCaught"]
+local REObtainedNewFish = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ObtainedNewFishNotification"]
+local REFishingStopped = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishingStopped"]
+local ItemsData = require(ReplicatedStorage.Items)
+
+local TierNames = {
+    [1] = "Common",
+    [2] = "Uncommon",
+    [3] = "Rare",
+    [4] = "Epic",
+    [5] = "Legendary",
+    [6] = "Mythic",
+    [7] = "Secret"
+}
+
+----------------------------------------------------
+-- ⚡ Thumbnail Cache + Preload System
+----------------------------------------------------
+local thumbnailCache = {}
 
 local function getRobloxThumbnail(assetId)
     if not assetId then return nil end
     if thumbnailCache[assetId] then
         return thumbnailCache[assetId]
     end
+
     local id = tostring(assetId):match("%d+")
     if not id then return nil end
-    local url = "https://www.roblox.com/thumbnail/image?assetId=" .. id .. "&width=420&height=420&format=png"
-    thumbnailCache[assetId] = url
-    return url
+
+    local url = "https://thumbnails.roblox.com/v1/assets?assetIds=" .. id .. "&size=420x420&format=Png"
+    local success, response = pcall(function()
+        return request({
+            Url = url,
+            Method = "GET"
+        })
+    end)
+
+    if success and response.StatusCode == 200 then
+        local data = HttpService:JSONDecode(response.Body)
+        if data.data and data.data[1] and data.data[1].imageUrl then
+            local imageUrl = data.data[1].imageUrl
+            thumbnailCache[assetId] = imageUrl
+            return imageUrl
+        end
+    end
+    return nil
+end
+
+-- 🔄 Preload semua thumbnail biar gak freeze saat mancing pertama kali
+task.spawn(function()
+    local itemsFolder = ReplicatedStorage:WaitForChild("Items")
+    local allItems = itemsFolder:GetChildren()
+    local total = #allItems
+    local loaded = 0
+
+    for _, item in pairs(allItems) do
+        if item:FindFirstChild("Data") then
+            local ok, data = pcall(require, item.Data)
+            if ok and data and data.Icon then
+                local url = getRobloxThumbnail(data.Icon)
+                if url then
+                    thumbnailCache[data.Icon] = url
+                    loaded += 1
+                end
+            end
+        end
+        task.wait(0.05) -- jeda biar gak ngebebanin request
+    end
+
+    print(string.format("✅ Preloaded %d/%d fish thumbnails.", loaded, total))
+end)
+
+----------------------------------------------------
+-- 🧠 Async Queue untuk Webhook (biar gak freeze)
+----------------------------------------------------
+local webhookQueue = {}
+local sending = false
+
+local function processQueue()
+    if sending then return end
+    sending = true
+
+    while #webhookQueue > 0 do
+        local payload = table.remove(webhookQueue, 1)
+        task.spawn(function()
+            local ok, err = pcall(function()
+                request({
+                    Url = payload.url,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = payload.body
+                })
+            end)
+            if not ok then
+                warn("❌ Webhook gagal dikirim:", err)
+            end
+        end)
+        task.wait(0.2) -- jeda antar webhook
+    end
+
+    sending = false
 end
 
 ----------------------------------------------------
--- 🎣 EVENT HOOK
+-- 🐟 Event Handling
 ----------------------------------------------------
-local REObtainedNewFish = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ObtainedNewFishNotification"]
-local REFishingStopped = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishingStopped"]
+local fishData = {}
 
-local rarityMap = {
-    [1] = {Name = "Common", Color = 9807270},
-    [0.02] = {Name = "Uncommon", Color = 3066993},
-    [0.004] = {Name = "Rare", Color = 3447003},
-    [0.001] = {Name = "Epic", Color = 10181046},
-    [0.0002] = {Name = "Legendary", Color = 15844367},
-    [0.00002] = {Name = "Mythic", Color = 15418782},
-    [0.000004] = {Name = "Secret", Color = 16711680}
-}
+REFishCaught.OnClientEvent:Connect(function(fishName, weightData)
+    fishData.name = fishName
+    fishData.weight = weightData.Weight
 
-local latestFish = {}
+    if ItemsData[fishName] and ItemsData[fishName].Data then
+        local data = ItemsData[fishName].Data
+        fishData.tier = data.Tier or 1
+        fishData.tierName = TierNames[data.Tier] or "Unknown"
+        fishData.iconAssetId = data.Icon
+    end
+end)
 
 REObtainedNewFish.OnClientEvent:Connect(function(fishId, weightData, notifData, isNew)
-    local fishInfo = fishCache[fishId]
-    if not fishInfo then return end
-
-    latestFish = {
-        Id = fishId,
-        Name = fishInfo.Name,
-        Weight = weightData.Weight,
-        Rarity = fishInfo.Rarity,
-        Icon = fishInfo.Icon,
-        IsNew = isNew
-    }
+    fishData.id = fishId
+    fishData.isNew = isNew
 end)
 
 REFishingStopped.OnClientEvent:Connect(function()
-    if not webhookEnabled or webhookURL == "" or not latestFish.Name then return end
+    task.wait(0.2)
+    if not webhookEnabled or webhookURL == "" then return end
 
-    local rarityData = rarityMap[latestFish.Rarity] or {Name = "Unknown", Color = 0}
-    local player = Players.LocalPlayer
-    local fishTier = rarityData.Name
-
-    if not table.find(selectedTiers, "All") and not table.find(selectedTiers, fishTier) then
+    local tierName = fishData.tierName or "Unknown"
+    if not table.find(selectedTiers, "All") and not table.find(selectedTiers, tierName) then
         return
     end
 
-    local imageURL = getRobloxThumbnail(latestFish.Icon)
+    local player = Players.LocalPlayer
+    local thumbnailUrl = thumbnailCache[fishData.iconAssetId] or getRobloxThumbnail(fishData.iconAssetId)
 
-    local embed = {
+    -- 💬 Buat embed webhook
+    local embedData = {
         ["embeds"] = {{
             ["title"] = "🎣 New Fish Caught!",
-            ["color"] = rarityData.Color,
+            ["color"] = 3447003,
+            ["image"] = thumbnailUrl and {["url"] = thumbnailUrl} or nil,
             ["fields"] = {
-                {["name"] = "👤 Username", ["value"] = player.Name, ["inline"] = true},
-                {["name"] = "🐟 Fish", ["value"] = latestFish.Name, ["inline"] = true},
-                {["name"] = "⚖️ Weight", ["value"] = string.format("%.2f kg", latestFish.Weight), ["inline"] = true},
-                {["name"] = "🏆 Rarity", ["value"] = fishTier, ["inline"] = true},
-                {["name"] = "✨ First Catch", ["value"] = latestFish.IsNew and "Yes" or "No", ["inline"] = true}
+                {["name"] = "👤 Username", ["value"] = "||" .. player.Name .. "||", ["inline"] = true},
+                {["name"] = "🐟 Fish Name", ["value"] = fishData.name or "Unknown", ["inline"] = true},
+                {["name"] = "⚖️ Weight", ["value"] = string.format("%.2f kg", fishData.weight or 0), ["inline"] = true},
+                {["name"] = "🏆 Tier", ["value"] = tierName, ["inline"] = true},
+                {["name"] = "First Catch", ["value"] = fishData.isNew and "✨ Yes" or "🔄 No", ["inline"] = true},
+                {["name"] = "🕐 Caught", ["value"] = "<t:" .. math.floor(os.time()) .. ":R>", ["inline"] = true}
             },
-            ["image"] = imageURL and {["url"] = imageURL} or nil,
-            ["footer"] = {["text"] = "Fish It Webhook by iSylHub Project"},
-            ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
+            ["footer"] = { ["text"] = "Fish It Webhook by iSylHub Project" },
+            ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%S")
         }}
     }
 
-    task.spawn(function()
-        local ok, err = pcall(function()
-            request({
-                Url = webhookURL,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = HttpService:JSONEncode(embed)
-            })
-        end)
+    -- 📨 Masukkan ke queue (biar gak freeze)
+    table.insert(webhookQueue, {
+        url = webhookURL,
+        body = HttpService:JSONEncode(embedData)
+    })
 
-        if ok then
-            print("✅ Webhook sent for:", latestFish.Name)
-        else
-            warn("❌ Webhook error:", err)
-        end
-    end)
-
-    latestFish = {}
+    processQueue()
+    fishData = {}
 end)
+
 
 ----------------------------------------------------
 -- 🚀 LOAD DONE
