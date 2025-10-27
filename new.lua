@@ -7523,8 +7523,6 @@ Vuln:AddParagraph({
     Content = "Wait until the developer updates it"
 })
 
-
-
 ----------------------------------------------------
 -- 🏠 HOME TAB
 ----------------------------------------------------
@@ -7645,7 +7643,7 @@ Auto:AddInput("SellDelayInput", {
         end
     end
 })
-						
+
 ----------------------------------------------------
 -- 🧭 TELEPORT TAB
 ----------------------------------------------------
@@ -7717,7 +7715,6 @@ Teleport:AddButton({
     end
 })
 
-
 ----------------------------------------------------
 -- 🌐 WEBHOOK TAB
 ----------------------------------------------------
@@ -7737,8 +7734,6 @@ local fishCache = {}
 ----------------------------------------------------
 -- 🧩 UI ELEMENTS
 ----------------------------------------------------
-
--- ✅ Toggle untuk aktif/inaktif webhook
 Webhook:AddToggle("EnableWebhook", {
     Title = "Enable Webhook",
     Description = "Kirim notifikasi ke Discord saat dapat ikan",
@@ -7753,7 +7748,6 @@ Webhook:AddToggle("EnableWebhook", {
     end
 })
 
--- 💬 TextBox untuk URL Webhook
 Webhook:AddInput("WebhookURL", {
     Title = "Webhook URL",
     Default = "",
@@ -7768,7 +7762,6 @@ Webhook:AddInput("WebhookURL", {
     end
 })
 
--- 🧭 Dropdown untuk filter tier
 Webhook:AddDropdown("TierSelect", {
     Title = "Select Tier Filter",
     Values = TierOptions,
@@ -7787,7 +7780,6 @@ Webhook:AddDropdown("TierSelect", {
 ----------------------------------------------------
 -- 🧠 CACHE & HELPER FUNCTION
 ----------------------------------------------------
-
 local function preloadFishData()
     local itemsFolder = ReplicatedStorage:WaitForChild("Items")
     for _, item in pairs(itemsFolder:GetChildren()) do
@@ -7805,10 +7797,8 @@ local function preloadFishData()
     print("✅ Cached", tostring(#fishCache), "fish data entries.")
 end
 
--- preload saat script start
 task.spawn(preloadFishData)
 
--- ambil thumbnail Roblox langsung dari endpoint publik
 local function getRobloxThumbnail(assetId)
     if not assetId then return nil end
     if thumbnailCache[assetId] then
@@ -7824,7 +7814,6 @@ end
 ----------------------------------------------------
 -- 🎣 EVENT HOOK
 ----------------------------------------------------
-
 local REObtainedNewFish = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ObtainedNewFishNotification"]
 local REFishingStopped = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FishingStopped"]
 
@@ -7861,7 +7850,6 @@ REFishingStopped.OnClientEvent:Connect(function()
     local player = Players.LocalPlayer
     local fishTier = rarityData.Name
 
-    -- filter tier
     if not table.find(selectedTiers, "All") and not table.find(selectedTiers, fishTier) then
         return
     end
@@ -7885,7 +7873,7 @@ REFishingStopped.OnClientEvent:Connect(function()
         }}
     }
 
-    task.spawn(function() -- anti-freeze
+    task.spawn(function()
         local ok, err = pcall(function()
             request({
                 Url = webhookURL,
@@ -7904,7 +7892,6 @@ REFishingStopped.OnClientEvent:Connect(function()
 
     latestFish = {}
 end)
-
 
 ----------------------------------------------------
 -- 🚀 LOAD DONE
