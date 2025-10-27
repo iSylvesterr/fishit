@@ -7542,29 +7542,12 @@ Home:AddButton({
 })
 
 ----------------------------------------------------
--- 🎣 MAIN TAB (Auto Fishing System v2)
+-- 🎣 MAIN TAB (Fast Legit Only)
 ----------------------------------------------------
 local MainSection = Main:AddSection("Auto Fishing System")
 
 local autoFishEnabled = false
 local autoFishThread
-local selectedMode = "Instant Safe"
-
--- Dropdown pilih mode
-Main:AddDropdown("FishingMode", {
-    Title = "Fishing Mode",
-    Values = { "Instant Safe", "Fast Legit" },
-    Default = selectedMode,
-    Multi = false,
-    Callback = function(Value)
-        selectedMode = Value
-        Fluent:Notify({
-            Title = "Fishing Mode",
-            Content = "Mode set to: " .. Value,
-            Duration = 3
-        })
-    end
-})
 
 ----------------------------------------------------
 -- ⚡ FAST LEGIT MODE (Spam Equip + Auto Click)
@@ -7578,13 +7561,13 @@ local function fastLegitLoop()
     local netFolder = ReplicatedStorage.Packages._Index:FindFirstChild("sleitnick_net@0.2.0").net
     local EquipToolRemote = netFolder:FindFirstChild("RE/EquipToolFromHotbar")
 
-    while autoFishEnabled and selectedMode == "Fast Legit" do
+    while autoFishEnabled do
         pcall(function()
             -- spam equip
             EquipToolRemote:FireServer(1)
         end)
 
-        -- simulasi auto click cepat
+        -- simulasi auto click super cepat
         pcall(function()
             VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
             task.wait(0.001)
@@ -7598,71 +7581,11 @@ local function fastLegitLoop()
 end
 
 ----------------------------------------------------
--- 🧩 INSTANT SAFE MODE (Auto Fishing v2)
-----------------------------------------------------
-local function instantSafeLoop()
-    print("=== Auto Fishing v2 (Instant Safe) ===")
-    print("Starting in 2 seconds...")
-    task.wait(0.5)
-
-    print("[Setup] Equipping fishing rod...")
-    pcall(function()
-        local args = { [1] = 1 }
-        game:GetService("ReplicatedStorage").Packages._Index
-            :FindFirstChild("sleitnick_net@0.2.0").net
-            :FindFirstChild("RE/EquipToolFromHotbar")
-            :FireServer(unpack(args))
-    end)
-
-    task.wait(1)
-    print("[Setup] Rod equipped! Starting fishing loop...\n")
-
-    while autoFishEnabled and selectedMode == "Instant Safe" do
-        print("[1] Charging rod...")
-        pcall(function()
-            local args = { [4] = tick() }
-            game:GetService("ReplicatedStorage").Packages._Index
-                :FindFirstChild("sleitnick_net@0.2.0").net
-                :FindFirstChild("RF/ChargeFishingRod")
-                :InvokeServer(unpack(args))
-        end)
-
-        task.wait(0.3)
-
-        print("[2] Casting...")
-        pcall(function()
-            local args = {
-                [1] = math.random(-150, -50) / 100,
-                [2] = math.random(80, 100) / 100,
-                [3] = tick()
-            }
-            game:GetService("ReplicatedStorage").Packages._Index
-                :FindFirstChild("sleitnick_net@0.2.0").net
-                :FindFirstChild("RF/RequestFishingMinigameStarted")
-                :InvokeServer(unpack(args))
-        end)
-
-        task.wait(1.2)
-
-        print("[3] Catching fish...")
-        pcall(function()
-            game:GetService("ReplicatedStorage").Packages._Index
-                :FindFirstChild("sleitnick_net@0.2.0").net
-                :FindFirstChild("RE/FishingCompleted")
-                :FireServer()
-        end)
-
-        task.wait(0.1)
-        print("--- Caught! Next cycle ---\n")
-    end
-end
-
-----------------------------------------------------
 -- 🟢 TOGGLE: START / STOP
 ----------------------------------------------------
 Main:AddToggle("AutoFishingSystem", {
-    Title = "Auto Fishing System",
-    Description = "Select mode and toggle ON to start fishing",
+    Title = "Fast Legit Auto Fishing",
+    Description = "Toggle ON to start Fast Legit fishing",
     Default = false,
     Callback = function(Value)
         autoFishEnabled = Value
@@ -7670,20 +7593,14 @@ Main:AddToggle("AutoFishingSystem", {
         if Value then
             Fluent:Notify({
                 Title = "Auto Fishing",
-                Content = "Started in mode: " .. selectedMode,
+                Content = "Fast Legit mode started 🚀",
                 Duration = 3
             })
-
-            if selectedMode == "Instant Safe" then
-                autoFishThread = task.spawn(instantSafeLoop)
-            elseif selectedMode == "Fast Legit" then
-                autoFishThread = task.spawn(fastLegitLoop)
-            end
-
+            autoFishThread = task.spawn(fastLegitLoop)
         else
             Fluent:Notify({
                 Title = "Auto Fishing",
-                Content = "Stopped.",
+                Content = "Stopped ❌",
                 Duration = 3
             })
         end
