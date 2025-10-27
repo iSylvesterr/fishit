@@ -7656,8 +7656,50 @@ Auto:AddInput("SellDelayInput", {
             })
         end
     end
+})			
+
+-- ═══════════════════════════════════════════════
+-- 🌤️ AUTO BUY WEATHER SECTION
+-- ═══════════════════════════════════════════════
+local AutoWeatherSection = Auto:AddSection("Auto Buy Weather")
+
+local selectedWeather = "Wind"
+local weatherOptions = {"Wind", "Cloudy", "Snow", "Storm", "Radiant", "Shark Hunt"}
+
+Auto:AddDropdown("WeatherSelect", {
+    Title = "Select Weather",
+    Values = weatherOptions,
+    Default = selectedWeather,
+    Multi = false,
+    Callback = function(Value)
+        selectedWeather = Value
+        Fluent:Notify({
+            Title = "Weather Selected",
+            Content = "Selected: " .. Value,
+            Duration = 2
+        })
+    end
 })
 
+Auto:AddButton({
+    Title = "Purchase Weather",
+    Description = "Buy the selected weather event",
+    Callback = function()
+        pcall(function()
+            local args = {
+                [1] = selectedWeather
+            }
+            game:GetService("ReplicatedStorage").Packages._Index:FindFirstChild("sleitnick_net@0.2.0").net:FindFirstChild("RF/PurchaseWeatherEvent"):InvokeServer(unpack(args))
+            
+            Fluent:Notify({
+                Title = "Weather Purchased!",
+                Content = "Bought: " .. selectedWeather .. " 🌤️",
+                Duration = 3
+            })
+        end)
+    end
+})
+						
 ----------------------------------------------------
 -- 🧭 TELEPORT TAB
 ----------------------------------------------------
