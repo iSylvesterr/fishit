@@ -7857,6 +7857,78 @@ Vuln:AddInput("CycleWait", {
     end
 })
 
+						
+----------------------------------------------------
+-- 🧭 TELEPORT TAB
+----------------------------------------------------
+local TeleportSection = Teleport:AddSection("Map Teleport")
+
+Teleport:AddParagraph({
+    Title = "🧭 Map Teleport System",
+    Content = "Pilih map dari daftar lalu tekan tombol teleport untuk berpindah lokasi dengan cepat."
+})
+
+local teleportLocations = {
+    ["Ancient Tample"] = CFrame.new(1872.81, 8.28, -570.20),
+    ["Kohana"] = CFrame.new(-642.57, 16.04, 610.54),
+    ["Hallowen Island"] = CFrame.new(1845, 22.99, 3105.09),
+    ["Esoteric Depth"] = CFrame.new(3228.52, -1302.85, 1403.73),
+    ["Tropical Grove"] = CFrame.new(-2018.93, 9.04, 3748.85),
+    ["Treasure Hall"] = CFrame.new(-3555.34, -266.57, -1599.73),
+    ["Weather Mechine"] = CFrame.new(-1505.14, 6.50, 1890.95),
+    ["Coral Reef"] = CFrame.new(-3173.28, 6.60, 2272.98),
+    ["Kohana Volcano"] = CFrame.new(-630.81, 55.88, 201.10),
+    ["Lost Isle"] = CFrame.new(-3741.32, -135.57, -1023.33)
+}
+
+local selectedMap = "Ancient Tample"
+
+local mapNames = {}
+for k, _ in pairs(teleportLocations) do
+    table.insert(mapNames, k)
+end
+table.sort(mapNames)
+
+Teleport:AddDropdown("MapSelect", {
+    Title = "Select Map",
+    Values = mapNames,
+    Default = selectedMap,
+    Multi = false,
+    Callback = function(Value)
+        selectedMap = Value
+        Fluent:Notify({
+            Title = "Map Selected",
+            Content = "You chose: " .. Value,
+            Duration = 2
+        })
+    end
+})
+
+Teleport:AddButton({
+    Title = "Teleport",
+    Description = "Teleport ke map terpilih",
+    Callback = function()
+        local loc = teleportLocations[selectedMap]
+        if loc then
+            task.spawn(function()
+                task.wait(1)
+                local plr = game.Players.LocalPlayer
+                if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    plr.Character.HumanoidRootPart.CFrame = loc
+                    print("[Teleport] Moved to:", selectedMap)
+                    Fluent:Notify({
+                        Title = "Teleported!",
+                        Content = "You are now at " .. selectedMap,
+                        Duration = 3
+                    })
+                else
+                    Fluent:Notify({ Title = "Teleport", Content = "Unable to teleport (character not ready).", Duration = 3 })
+                end
+            end)
+        end
+    end
+})
+
 
 ----------------------------------------------------
 -- 🌐 WEBHOOK TAB
