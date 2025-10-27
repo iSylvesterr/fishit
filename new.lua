@@ -7587,11 +7587,11 @@ local function fastLegitLoop()
         -- simulasi auto click cepat
         pcall(function()
             VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-            task.wait(0.001)
+            task.wait(0.01)
             VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
         end)
 
-        task.wait(0.001)
+        task.wait(0.01)
     end
 
     print("Fast Legit loop stopped.")
