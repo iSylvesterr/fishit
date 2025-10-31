@@ -7487,17 +7487,17 @@ end)() -- ini akhir beta.lua
 ----------------------------------------------------
 local Window = Library:CreateWindow({
     Title = "iSylHub",
-    SubTitle = "- Fish It",
+    SubTitle = "- Fish It PREMIUM",
     TabWidth = 100,
     Size = UDim2.fromOffset(500, 350),
     Acrylic = true,
-    Theme = "Sapphire",
+    Theme = "Amoled",
     MinimizeKey = Enum.KeyCode.LeftControl,
     UserInfo = false,
 })
 
 local Minimizer = Library:CreateMinimizer({
-    Icon = "https://raw.githubusercontent.com/iSylvesterr/iSylHub/refs/heads/main/A305EE7E-83A9-4BA2-AC47-3EAD0C62497B.png",
+    Icon = "settings",
     Size = UDim2.fromOffset(48, 48),
     Position = UDim2.new(0, 320, 0, 24),
     Acrylic = true,
