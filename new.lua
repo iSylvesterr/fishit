@@ -7548,6 +7548,8 @@ local MainSection = Main:AddSection("Auto Fishing System")
 
 local autoFishEnabled = false
 local autoFishThread
+local instantBetaEnabled = false
+local instantBetaThread
 
 ----------------------------------------------------
 -- ⚡ FAST LEGIT MODE (Burst Tap Every 0.3s)
@@ -7596,7 +7598,99 @@ local function fastLegitLoop()
 end
 
 ----------------------------------------------------
--- 🟢 TOGGLE: START / STOP
+-- ⚡ INSTANT FISHING BETA MODE
+----------------------------------------------------
+local function instantFishingBeta()
+    print("=== Instant Fishing Beta ===")
+    
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local netPackage = ReplicatedStorage.Packages._Index:FindFirstChild("sleitnick_net@0.2.0")
+    local net = netPackage and netPackage.net or nil
+    
+    local function getRemote(remoteType, remoteName)
+        if not net then return nil end
+        return net:FindFirstChild(remoteType .. "/" .. remoteName)
+    end
+    
+    local function invokeRemote(remoteName, args)
+        local remote = getRemote("RF", remoteName)
+        if remote then
+            pcall(function()
+                remote:InvokeServer(unpack(args or {}))
+            end)
+        end
+    end
+    
+    local function fireRemote(remoteName, args)
+        local remote = getRemote("RE", remoteName)
+        if remote then
+            pcall(function()
+                remote:FireServer(unpack(args or {}))
+            end)
+        end
+    end
+    
+    local function chargeFishingRod()
+        invokeRemote("ChargeFishingRod", {[4] = tick()})
+    end
+    
+    local function requestFishingMinigame()
+        local args = {
+            [1] = math.random(-150, -50) / 100,
+            [2] = math.random(80, 100) / 100,
+            [3] = tick()
+        }
+        invokeRemote("RequestFishingMinigameStarted", args)
+    end
+    
+    local function chargeAndRequest()
+        task.spawn(chargeFishingRod)
+        task.spawn(requestFishingMinigame)
+    end
+    
+    local function cancelFishingInputs()
+        invokeRemote("CancelFishingInputs")
+    end
+    
+    local function completeFishing()
+        fireRemote("FishingCompleted")
+    end
+    
+    -- Equip fishing rod
+    fireRemote("EquipToolFromHotbar", {[1] = 1})
+    task.wait(1)
+    
+    print("[Beta] Loop started!")
+    
+    while instantBetaEnabled do
+        cancelFishingInputs()
+        task.wait(0.075)
+        
+        -- Phase 1: Charge+Request
+        print("[Phase 1] Charge+Request...")
+        chargeAndRequest()
+        task.wait(0.1)
+        
+        -- Phase 3: Equip
+        fireRemote("EquipToolFromHotbar", {[1] = 1})
+        print("[Phase 3] Waiting...")
+        task.wait(1.740)
+        
+        -- Phase 4: Complete
+        print("[Phase 4] Completing...")
+        completeFishing()
+        task.wait(0.1)
+        
+        -- Cooldown
+        print("[Cooldown] 0.3s...\n")
+        task.wait(0.3)
+    end
+    
+    print("Instant Beta loop stopped.")
+end
+
+----------------------------------------------------
+-- 🟢 TOGGLE: FAST LEGIT
 ----------------------------------------------------
 Main:AddToggle("AutoFishingSystem", {
     Title = "Fast Legit Auto Fishing",
@@ -7615,7 +7709,34 @@ Main:AddToggle("AutoFishingSystem", {
         else
             Fluent:Notify({
                 Title = "Auto Fishing",
-                Content = "Stopped ❌",
+                Content = "Fast Legit stopped ❌",
+                Duration = 3
+            })
+        end
+    end
+})
+
+----------------------------------------------------
+-- 🟢 TOGGLE: INSTANT FISHING BETA
+----------------------------------------------------
+Main:AddToggle("InstantFishingBeta", {
+    Title = "Instant Fishing Beta",
+    Description = "Toggle ON to start Instant Fishing (Experimental)",
+    Default = false,
+    Callback = function(Value)
+        instantBetaEnabled = Value
+
+        if Value then
+            Fluent:Notify({
+                Title = "Instant Fishing Beta",
+                Content = "Beta mode started ⚡",
+                Duration = 3
+            })
+            instantBetaThread = task.spawn(instantFishingBeta)
+        else
+            Fluent:Notify({
+                Title = "Instant Fishing Beta",
+                Content = "Beta stopped ❌",
                 Duration = 3
             })
         end
