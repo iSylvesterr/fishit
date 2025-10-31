@@ -7550,10 +7550,10 @@ local autoFishEnabled = false
 local autoFishThread
 
 ----------------------------------------------------
--- ⚡ FAST LEGIT MODE (Spam Equip + Auto Click)
+-- ⚡ FAST LEGIT MODE (Burst Tap Every 0.3s)
 ----------------------------------------------------
 local function fastLegitLoop()
-    print("=== Fast Legit Fishing ===")
+    print("=== Fast Legit Fishing (Burst Tap) ===")
 
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -7561,20 +7561,35 @@ local function fastLegitLoop()
     local netFolder = ReplicatedStorage.Packages._Index:FindFirstChild("sleitnick_net@0.2.0").net
     local EquipToolRemote = netFolder:FindFirstChild("RE/EquipToolFromHotbar")
 
+    -- Equip rod once
+    print("[Setup] Equipping fishing rod...")
+    pcall(function()
+        EquipToolRemote:FireServer(1)
+    end)
+
+    task.wait(1)
+    print("[Setup] Starting burst tap loop...\n")
+
+    -- Main loop
     while autoFishEnabled do
-        pcall(function()
-            -- spam equip
-            EquipToolRemote:FireServer(1)
-        end)
+        print("[Burst] Tapping rapidly...")
 
-        -- simulasi auto click super cepat
-        pcall(function()
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-            task.wait(0.001)
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-        end)
-
-        task.wait(0.001)
+        -- BURST: Spam click 10-15 kali cepet
+        local burstCount = math.random(10, 15)
+        for i = 1, burstCount do
+            pcall(function()
+                -- Click down
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                task.wait(0.02) -- Hold 20ms
+                -- Click up
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+            end)
+            task.wait(0.05) -- Delay antar click dalam burst (50ms)
+        end
+        
+        print("[Burst] Done! (" .. burstCount .. " clicks)")
+        print("[Wait] 0.3s cooldown...\n")
+        task.wait(0.3) -- Cooldown sebelum burst berikutnya
     end
 
     print("Fast Legit loop stopped.")
