@@ -7542,7 +7542,7 @@ Home:AddButton({
 })
 
 ----------------------------------------------------
--- 🎣 MAIN TAB (Fast Legit Only)
+-- 🎣 MAIN TAB (Fast Legit + Instant v4)
 ----------------------------------------------------
 local MainSection = Main:AddSection("Auto Fishing System")
 
@@ -7574,44 +7574,45 @@ local function fastLegitLoop()
 
     -- Main loop
     while autoFishEnabled do
-        print("[Burst] Tapping rapidly...")
-
-        -- BURST: Spam click 10-15 kali cepet
         local burstCount = math.random(10, 15)
         for i = 1, burstCount do
             pcall(function()
-                -- Click down
                 VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                task.wait(0.02) -- Hold 20ms
-                -- Click up
+                task.wait(0.02)
                 VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
             end)
-            task.wait(0.05) -- Delay antar click dalam burst (50ms)
+            task.wait(0.05)
         end
-        
-        print("[Burst] Done! (" .. burstCount .. " clicks)")
-        print("[Wait] 0.3s cooldown...\n")
-        task.wait(0.3) -- Cooldown sebelum burst berikutnya
+        task.wait(0.3)
     end
 
     print("Fast Legit loop stopped.")
 end
 
 ----------------------------------------------------
--- ⚡ INSTANT FISHING BETA MODE
+-- ⚡ INSTANT FISHING v4 (Spam Pattern)
 ----------------------------------------------------
+local WAIT_AFTER_CHARGE = 1.3
+local DELAY_EQ = 0.3
+
 local function instantFishingBeta()
-    print("=== Instant Fishing Beta ===")
-    
+    print("=== Instant Fishing v4 (Spam Pattern) ===")
+
+    -- Config
+    local SPAM_COUNT = 1
+    local SPAM_DELAY = 0.05
+    local CANCEL_DELAY_SEC = 0.03
+    local COOLDOWN_DELAY = 0.05
+
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local netPackage = ReplicatedStorage.Packages._Index:FindFirstChild("sleitnick_net@0.2.0")
     local net = netPackage and netPackage.net or nil
-    
+
     local function getRemote(remoteType, remoteName)
         if not net then return nil end
         return net:FindFirstChild(remoteType .. "/" .. remoteName)
     end
-    
+
     local function invokeRemote(remoteName, args)
         local remote = getRemote("RF", remoteName)
         if remote then
@@ -7620,7 +7621,7 @@ local function instantFishingBeta()
             end)
         end
     end
-    
+
     local function fireRemote(remoteName, args)
         local remote = getRemote("RE", remoteName)
         if remote then
@@ -7629,11 +7630,11 @@ local function instantFishingBeta()
             end)
         end
     end
-    
+
     local function chargeFishingRod()
         invokeRemote("ChargeFishingRod", {[4] = tick()})
     end
-    
+
     local function requestFishingMinigame()
         local args = {
             [1] = math.random(-150, -50) / 100,
@@ -7642,51 +7643,45 @@ local function instantFishingBeta()
         }
         invokeRemote("RequestFishingMinigameStarted", args)
     end
-    
+
     local function chargeAndRequest()
         task.spawn(chargeFishingRod)
         task.spawn(requestFishingMinigame)
     end
-    
+
     local function cancelFishingInputs()
         invokeRemote("CancelFishingInputs")
     end
-    
+
     local function completeFishing()
         fireRemote("FishingCompleted")
     end
-    
-    -- Equip fishing rod
-    fireRemote("EquipToolFromHotbar", {[1] = 1})
-    task.wait(1)
-    
-    print("[Beta] Loop started!")
-    
+
+    -- Main loop
     while instantBetaEnabled do
-        cancelFishingInputs()
-        task.wait(0.075)
-        
-        -- Phase 1: Charge+Request
-        print("[Phase 1] Charge+Request...")
-        chargeAndRequest()
-        task.wait(0.1)
-        
-        -- Phase 3: Equip
         fireRemote("EquipToolFromHotbar", {[1] = 1})
-        print("[Phase 3] Waiting...")
-        task.wait(1.740)
-        
-        -- Phase 4: Complete
-        print("[Phase 4] Completing...")
-        completeFishing()
-        task.wait(0.1)
-        
-        -- Cooldown
-        print("[Cooldown] 0.3s...\n")
-        task.wait(0.3)
+        task.wait(DELAY_EQ)
+
+        cancelFishingInputs()
+        task.wait(CANCEL_DELAY_SEC)
+
+        for i = 1, SPAM_COUNT do
+            chargeAndRequest()
+            task.wait(SPAM_DELAY)
+        end
+
+        fireRemote("EquipToolFromHotbar", {[1] = 1})
+        task.wait(WAIT_AFTER_CHARGE)
+
+        for i = 1, SPAM_COUNT do
+            completeFishing()
+            task.wait(SPAM_DELAY)
+        end
+
+        task.wait(COOLDOWN_DELAY)
     end
-    
-    print("Instant Beta loop stopped.")
+
+    print("Instant Fishing v4 stopped.")
 end
 
 ----------------------------------------------------
@@ -7717,27 +7712,61 @@ Main:AddToggle("AutoFishingSystem", {
 })
 
 ----------------------------------------------------
--- 🟢 TOGGLE: INSTANT FISHING BETA
+-- 🟢 TOGGLE + INPUT: INSTANT FISHING v4
 ----------------------------------------------------
-Main:AddToggle("InstantFishingBeta", {
-    Title = "Instant Fishing Beta",
-    Description = "Toggle ON to start Instant Fishing (Experimental)",
+Main:AddToggle("InstantFishingV4", {
+    Title = "Instant Fishing v4 (Spam Pattern)",
+    Description = "Toggle ON to start Instant Fishing",
     Default = false,
     Callback = function(Value)
         instantBetaEnabled = Value
 
         if Value then
             Fluent:Notify({
-                Title = "Instant Fishing Beta",
-                Content = "Beta mode started ⚡",
+                Title = "Instant Fishing v4",
+                Content = "Instant mode started ⚡",
                 Duration = 3
             })
             instantBetaThread = task.spawn(instantFishingBeta)
         else
             Fluent:Notify({
-                Title = "Instant Fishing Beta",
-                Content = "Beta stopped ❌",
+                Title = "Instant Fishing v4",
+                Content = "Instant stopped ❌",
                 Duration = 3
+            })
+        end
+    end
+})
+
+Main:AddInput("WaitAfterChargeInput", {
+    Title = "Delay After Caught (WAIT_AFTER_CHARGE)",
+    Default = tostring(WAIT_AFTER_CHARGE),
+    Placeholder = "ex: 1.3",
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num then
+            WAIT_AFTER_CHARGE = num
+            Fluent:Notify({
+                Title = "Updated",
+                Content = "WAIT_AFTER_CHARGE set to " .. num,
+                Duration = 2
+            })
+        end
+    end
+})
+
+Main:AddInput("DelayEqInput", {
+    Title = "Delay Reel (DELAY_EQ)",
+    Default = tostring(DELAY_EQ),
+    Placeholder = "ex: 0.3",
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num then
+            DELAY_EQ = num
+            Fluent:Notify({
+                Title = "Updated",
+                Content = "DELAY_EQ set to " .. num,
+                Duration = 2
             })
         end
     end
