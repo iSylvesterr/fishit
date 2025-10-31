@@ -7748,7 +7748,7 @@ Main:AddInput("WaitAfterChargeInput", {
             WAIT_AFTER_CHARGE = num
             Fluent:Notify({
                 Title = "Updated",
-                Content = "WAIT_AFTER_CHARGE set to " .. num,
+                Content = "Delay Instant set to " .. num,
                 Duration = 2
             })
         end
@@ -7765,7 +7765,7 @@ Main:AddInput("DelayEqInput", {
             DELAY_EQ = num
             Fluent:Notify({
                 Title = "Updated",
-                Content = "DELAY_EQ set to " .. num,
+                Content = "Delay Reel set to " .. num,
                 Duration = 2
             })
         end
