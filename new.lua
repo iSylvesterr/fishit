@@ -7491,7 +7491,7 @@ local Window = Library:CreateWindow({
     TabWidth = 100,
     Size = UDim2.fromOffset(500, 350),
     Acrylic = true,
-    Theme = "Dark",
+    Theme = "Darker",
     MinimizeKey = Enum.KeyCode.LeftControl,
     UserInfo = false,
 })
