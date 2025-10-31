@@ -7739,7 +7739,7 @@ Main:AddToggle("InstantFishingV4", {
 })
 
 Main:AddInput("WaitAfterChargeInput", {
-    Title = "Delay After Caught (WAIT_AFTER_CHARGE)",
+    Title = "Delay After Caught",
     Default = tostring(WAIT_AFTER_CHARGE),
     Placeholder = "ex: 1.3",
     Callback = function(Value)
@@ -7756,7 +7756,7 @@ Main:AddInput("WaitAfterChargeInput", {
 })
 
 Main:AddInput("DelayEqInput", {
-    Title = "Delay Reel (DELAY_EQ)",
+    Title = "Delay Reel",
     Default = tostring(DELAY_EQ),
     Placeholder = "ex: 0.3",
     Callback = function(Value)
